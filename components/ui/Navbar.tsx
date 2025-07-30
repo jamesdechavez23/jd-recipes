@@ -10,6 +10,7 @@ import {
    NavigationMenuLink
 } from "./shadcn/navigation-menu"
 import { User } from "@/app/layout"
+import Link from "next/link"
 
 type NavbarProps = {
    user: User | null
@@ -38,9 +39,14 @@ export function Navbar({ user }: NavbarProps) {
                </NavigationMenuList>
             </NavigationMenu>
          ) : (
-            <Button variant="ghost" size="icon" aria-label="User">
-               <UserIcon />
-            </Button>
+            <Link className="-ml-2" href="/login" passHref>
+               <Button variant="ghost" aria-label="User" asChild>
+                  <span className="flex items-center gap-2">
+                     <UserIcon />
+                     <span>Login</span>
+                  </span>
+               </Button>
+            </Link>
          )}
       </nav>
    )
