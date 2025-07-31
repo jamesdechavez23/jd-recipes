@@ -35,7 +35,7 @@ export default function RootLayout({
    }
 
    return (
-      <html lang="en" className="dark">
+      <html lang="en">
          <body className={`${geistSans.variable} ${geistMono.variable} bg-background text-foreground antialiased`}>
             <ThemeToggle />
             <Navbar user={null} />
