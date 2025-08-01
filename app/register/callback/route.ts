@@ -4,11 +4,10 @@ import { NextResponse } from "next/server"
 export async function GET(request: Request) {
    const { searchParams, origin } = new URL(request.url)
    const code = searchParams.get("code")
-   let next = searchParams.get("next") ?? "/"
+   let next = searchParams.get("next") ?? "/recipe-book"
    if (!next.startsWith("/")) {
       next = "/"
    }
-   console.log("Code received:", code)
 
    if (code) {
       const supabase = await createClient()

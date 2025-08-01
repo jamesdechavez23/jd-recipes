@@ -4,28 +4,22 @@ import { checkPublicPage } from "./lib/utils"
 
 export async function middleware(request: NextRequest) {
    const { pathname } = request.nextUrl
-
-   try {
-      const { supabase, response } = await createClient(request)
-      const { data } = await supabase.auth.getClaims()
-      const user = data?.claims
-      const isPublicPage = checkPublicPage(pathname)
-
-      if (isPublicPage || user) {
-         return response
-      }
-
-      if (!user && !isPublicPage) {
-         const loginUrl = new URL("/login", request.url)
-         console.log(`Redirecting from ${pathname} to ${loginUrl.pathname}`, { user, isPublicPage })
-         return NextResponse.redirect(loginUrl)
-      }
-
-      return response
-   } catch (error) {
-      console.error("Error in middleware:", { error })
+   const isPublicPage = checkPublicPage(pathname)
+   if (isPublicPage) {
       return NextResponse.next()
    }
+
+   const { supabase, response } = await createClient(request)
+
+   const { data, error } = await supabase.auth.getClaims()
+   const user = data?.claims || null
+   if (error || !user) {
+      if (error) console.error("Error fetching user claims:", { error })
+      const loginUrl = new URL("/login", request.url)
+      return NextResponse.redirect(loginUrl)
+   }
+
+   return NextResponse.next(response)
 }
 
 export const config = {

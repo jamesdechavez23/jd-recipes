@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 import ThemeToggle from "@/components/ui/ThemeToggle"
 import Navbar from "@/components/ui/Navbar"
+import { createClient } from "@/lib/supabase/server"
 
 const geistSans = Geist({
    variable: "--font-geist-sans",
@@ -19,26 +20,19 @@ export const metadata: Metadata = {
    description: "Online Recipe Book application from JD"
 }
 
-export type User = {
-   id: string
-   email: string
-}
-
-export default function RootLayout({
+export default async function RootLayout({
    children
 }: Readonly<{
    children: React.ReactNode
 }>) {
-   const user: User = {
-      id: "1",
-      email: "user@example.com"
-   }
-
+   const supabase = await createClient()
+   const { data } = await supabase.auth.getClaims()
+   const user = data?.claims || null
    return (
       <html lang="en">
          <body className={`${geistSans.variable} ${geistMono.variable} bg-background text-foreground antialiased`}>
             <ThemeToggle />
-            <Navbar user={null} />
+            <Navbar user={user} />
             {children}
          </body>
       </html>
