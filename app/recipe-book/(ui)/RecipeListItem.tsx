@@ -7,8 +7,16 @@ import { Button } from "@/components/ui/shadcn/button"
 import Link from "next/link"
 import { useState } from "react"
 import { Badge } from "@/components/ui/shadcn/badge"
+import { Recipe } from "@/lib/types"
 
-export default function RecipeListItem() {
+interface RecipeListItemProps {
+   recipe: Recipe
+}
+
+export default function RecipeListItem({ recipe }: RecipeListItemProps) {
+   const { title, video, macros, time, servings, ingredients } = recipe
+   const videoChannel = video?.channel || "Unknown Channel"
+   const { calories, protein, carbohydrates, fat } = macros
    const [ingredientsVisible, setIngredientsVisible] = useState(false)
    const handleShowIngredients = (e: React.MouseEvent) => {
       e.preventDefault()
@@ -16,11 +24,11 @@ export default function RecipeListItem() {
       setIngredientsVisible(!ingredientsVisible)
    }
    return (
-      <Link href="/recipe/1" className="block">
+      <Link href={`/recipe/${recipe.id}`} className="block">
          <div className="border border-b-foreground bg-card text-card-foreground pt-4 px-2 max-w-lg hover:border-accent">
             <div className="flex items-center gap-2 mb-2">
-               <h2 className="text-lg font-semibold text-nowrap">Pork Sinigang</h2>
-               <p className="text-nowrap overflow-hidden text-ellipsis">by Taste to Share PH Taste to Share PH Taste to Share PH</p>
+               <h2 className="text-lg font-semibold text-nowrap">{title}</h2>
+               <p className="text-nowrap overflow-hidden text-ellipsis">by {videoChannel}</p>
             </div>
             <Separator className="mb-2" />
             <div className="flex gap-4 justify-between mb-2">
@@ -29,7 +37,7 @@ export default function RecipeListItem() {
                      <TooltipTrigger asChild>
                         <div className="flex gap-2 items-center">
                            <Zap className="w-4 h-4" />
-                           <span>500</span>
+                           <span>{calories}</span>
                         </div>
                      </TooltipTrigger>
                      <TooltipContent>
@@ -42,7 +50,7 @@ export default function RecipeListItem() {
                      <TooltipTrigger asChild>
                         <div className="flex gap-2 items-center">
                            <Drumstick className="w-4 h-4" />
-                           <span>20</span>
+                           <span>{protein}</span>
                         </div>
                      </TooltipTrigger>
                      <TooltipContent>
@@ -55,7 +63,7 @@ export default function RecipeListItem() {
                      <TooltipTrigger asChild>
                         <div className="flex gap-2 items-center">
                            <Croissant className="w-4 h-4" />
-                           <span>20</span>
+                           <span>{carbohydrates}</span>
                         </div>
                      </TooltipTrigger>
                      <TooltipContent>
@@ -68,7 +76,7 @@ export default function RecipeListItem() {
                      <TooltipTrigger asChild>
                         <div className="flex gap-2 items-center">
                            <Nut className="w-4 h-4" />
-                           <span>15</span>
+                           <span>{fat}</span>
                         </div>
                      </TooltipTrigger>
                      <TooltipContent>
@@ -83,7 +91,7 @@ export default function RecipeListItem() {
                      <TooltipTrigger asChild>
                         <div className="flex gap-2 items-center">
                            <Utensils className="w-4 h-4" />
-                           <span>5</span>
+                           <span>{servings}</span>
                         </div>
                      </TooltipTrigger>
                      <TooltipContent>
@@ -96,7 +104,7 @@ export default function RecipeListItem() {
                      <TooltipTrigger asChild>
                         <div className="flex gap-2 items-center">
                            <Clock className="w-4 h-4" />
-                           <span>3h</span>
+                           <span>{time}</span>
                         </div>
                      </TooltipTrigger>
                      <TooltipContent>
@@ -114,42 +122,11 @@ export default function RecipeListItem() {
             </div>
             {ingredientsVisible && (
                <ul className="px-4 pb-4 flex gap-4 flex-wrap justify-around">
-                  <li>
-                     <Badge variant={"outline"}>test 1</Badge>
-                  </li>
-                  <li>
-                     <Badge variant={"outline"}>testasdf 2</Badge>
-                  </li>
-                  <li>
-                     <Badge variant={"outline"}>test 3</Badge>
-                  </li>
-                  <li>
-                     <Badge variant={"outline"}>testasd 4</Badge>
-                  </li>
-                  <li>
-                     <Badge variant={"outline"}>test 5</Badge>
-                  </li>
-                  <li>
-                     <Badge variant={"outline"}>testf 6</Badge>
-                  </li>
-                  <li>
-                     <Badge variant={"outline"}>test 7</Badge>
-                  </li>
-                  <li>
-                     <Badge variant={"outline"}>testasdfasfd 8</Badge>
-                  </li>
-                  <li>
-                     <Badge variant={"outline"}>test 9</Badge>
-                  </li>
-                  <li>
-                     <Badge variant={"outline"}>test 10</Badge>
-                  </li>
-                  <li>
-                     <Badge variant={"outline"}>test 11</Badge>
-                  </li>
-                  <li>
-                     <Badge variant={"outline"}>test 12</Badge>
-                  </li>
+                  {ingredients.map((ingredient, index) => (
+                     <li key={index}>
+                        <Badge variant={"outline"}>{ingredient}</Badge>
+                     </li>
+                  ))}
                </ul>
             )}
          </div>
