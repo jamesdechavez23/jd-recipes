@@ -5,18 +5,23 @@ import { checkPublicPage } from "./lib/utils"
 export async function middleware(request: NextRequest) {
    const { pathname } = request.nextUrl
    const isPublicPage = checkPublicPage(pathname)
-   if (isPublicPage) {
-      return NextResponse.next()
-   }
-
-   const { supabase, response } = await createClient(request)
+   const { supabase, response } = createClient(request)
 
    const { data, error } = await supabase.auth.getClaims()
    const user = data?.claims || null
+
    if (error || !user) {
       if (error) console.error("Error fetching user claims:", { error })
+      if (isPublicPage) {
+         return NextResponse.next(response)
+      }
       const loginUrl = new URL("/login", request.url)
       return NextResponse.redirect(loginUrl)
+   }
+
+   if (user && isPublicPage) {
+      const redirectUrl = new URL("/recipe-book", request.url)
+      return NextResponse.redirect(redirectUrl)
    }
 
    return NextResponse.next(response)

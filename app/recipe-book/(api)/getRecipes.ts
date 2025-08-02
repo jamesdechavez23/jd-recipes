@@ -17,7 +17,9 @@ const MOCK_DATA: Recipe[] = [
       },
       time: "3h",
       servings: 5,
-      ingredients: ["Pork", "Tamarind", "Tomatoes", "Radish", "Eggplant", "Water", "Fish Sauce", "Salt", "Pepper"]
+      ingredients: ["Pork", "Tamarind", "Tomatoes", "Radish", "Eggplant", "Water", "Fish Sauce", "Salt", "Pepper"],
+      cuisine: "Filipino",
+      mealType: "Main Course"
    },
    {
       id: 2,
@@ -33,7 +35,9 @@ const MOCK_DATA: Recipe[] = [
       },
       time: "1h",
       servings: 4,
-      ingredients: ["Chicken", "Soy Sauce", "Vinegar", "Garlic", "Bay Leaves", "Peppercorns"]
+      ingredients: ["Chicken", "Soy Sauce", "Vinegar", "Garlic", "Bay Leaves", "Peppercorns"],
+      cuisine: "Filipino",
+      mealType: "Main Course"
    },
    {
       id: 3,
@@ -49,7 +53,9 @@ const MOCK_DATA: Recipe[] = [
       },
       time: "2h",
       servings: 6,
-      ingredients: ["Beef", "Peanut Butter", "Eggplant", "String Beans", "Bok Choy", "Oxtail"]
+      ingredients: ["Beef", "Peanut Butter", "Eggplant", "String Beans", "Bok Choy", "Oxtail"],
+      cuisine: "Filipino",
+      mealType: "Main Course"
    },
    {
       id: 4,
@@ -65,7 +71,9 @@ const MOCK_DATA: Recipe[] = [
       },
       time: "1h",
       servings: 8,
-      ingredients: ["Ground Pork", "Carrots", "Onions", "Garlic", "Spring Roll Wrappers", "Oil for Frying"]
+      ingredients: ["Ground Pork", "Carrots", "Onions", "Garlic", "Spring Roll Wrappers", "Oil for Frying"],
+      cuisine: "Filipino",
+      mealType: "Appetizer"
    },
    {
       id: 5,
@@ -81,7 +89,9 @@ const MOCK_DATA: Recipe[] = [
       },
       time: "2h",
       servings: 5,
-      ingredients: ["Pork Belly", "Tamarind", "Radish", "Water Spinach", "Green Chili", "Fish Sauce"]
+      ingredients: ["Pork Belly", "Tamarind", "Radish", "Water Spinach", "Green Chili", "Fish Sauce"],
+      cuisine: "Filipino",
+      mealType: "Main Course"
    },
    {
       id: 6,
@@ -97,7 +107,9 @@ const MOCK_DATA: Recipe[] = [
       },
       time: "1.5h",
       servings: 4,
-      ingredients: ["Pork", "Coconut Milk", "Shrimp Paste", "Chili Peppers", "Garlic", "Onions"]
+      ingredients: ["Pork", "Coconut Milk", "Shrimp Paste", "Chili Peppers", "Garlic", "Onions"],
+      cuisine: "Filipino",
+      mealType: "Main Course"
    },
    {
       id: 7,
@@ -113,7 +125,9 @@ const MOCK_DATA: Recipe[] = [
       },
       time: "1h",
       servings: 4,
-      ingredients: ["Egg Noodles", "Chicken", "Shrimp", "Carrots", "Cabbage", "Soy Sauce"]
+      ingredients: ["Egg Noodles", "Chicken", "Shrimp", "Carrots", "Cabbage", "Soy Sauce"],
+      cuisine: "Filipino",
+      mealType: "Main Course"
    },
    {
       id: 8,
@@ -129,11 +143,16 @@ const MOCK_DATA: Recipe[] = [
       },
       time: "30m",
       servings: 2,
-      ingredients: ["Shaved Ice", "Evaporated Milk", "Sweetened Beans", "Fruits", "Leche Flan", "Ube"]
+      ingredients: ["Shaved Ice", "Evaporated Milk", "Sweetened Beans", "Fruits", "Leche Flan", "Ube"],
+      cuisine: "Filipino",
+      mealType: "Dessert"
    }
 ]
 
 export default async function getRecipes() {
    const recipes = MOCK_DATA // Replace with actual data fetching logic
-   return { recipes, error: null }
+   const cuisines = Array.from(new Set(recipes.map(recipe => recipe.cuisine)))
+   const mealTypes = Array.from(new Set(recipes.map(recipe => recipe.mealType)))
+   const ingredients = Array.from(new Set(recipes.flatMap(recipe => recipe.ingredients))).sort((a, b) => a.localeCompare(b))
+   return { recipes, cuisines, mealTypes, ingredients, error: null }
 }

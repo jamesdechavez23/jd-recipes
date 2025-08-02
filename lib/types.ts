@@ -3,6 +3,7 @@ export type Recipe = {
    title: string
    video?: {
       channel: string
+      videoId: string
    }
    macros: {
       calories: number
@@ -13,4 +14,6 @@ export type Recipe = {
    time: string
    servings: number
    ingredients: string[]
+   cuisine: string
+   mealType: string
 }

@@ -31,7 +31,7 @@ export default function RecipeListItem({ recipe }: RecipeListItemProps) {
                <p className="text-nowrap overflow-hidden text-ellipsis">by {videoChannel}</p>
             </div>
             <Separator className="mb-2" />
-            <div className="flex gap-4 justify-between mb-2">
+            <div className="flex gap-4 justify-between mb-2 px-2">
                <TooltipProvider>
                   <Tooltip>
                      <TooltipTrigger asChild>
@@ -85,7 +85,7 @@ export default function RecipeListItem({ recipe }: RecipeListItemProps) {
                   </Tooltip>
                </TooltipProvider>
             </div>
-            <div className="flex gap-4 justify-between">
+            <div className="flex gap-4 justify-between px-2">
                <TooltipProvider>
                   <Tooltip>
                      <TooltipTrigger asChild>
@@ -95,7 +95,7 @@ export default function RecipeListItem({ recipe }: RecipeListItemProps) {
                         </div>
                      </TooltipTrigger>
                      <TooltipContent>
-                        <span>Recipe ID</span>
+                        <span>Servings</span>
                      </TooltipContent>
                   </Tooltip>
                </TooltipProvider>
