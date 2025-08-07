@@ -28,7 +28,9 @@ export default function BottomToggleBar() {
    return (
       <div className="fixed bottom-0 left-0 w-full bg-muted border-t flex justify-around z-50 md:hidden">
          <Button
-            className={`px-4 py-2 border w-1/2 rounded-none h-full ${currentToggle === "ingredients" ? "bg-primary text-primary-foreground" : ""}`}
+            className={`px-4 py-2 border w-1/2 rounded-none h-full ${
+               currentToggle === "ingredients" ? "bg-primary text-primary-foreground !opacity-100" : ""
+            }`}
             variant="outline"
             onClick={() => handleClick("ingredients")}
             disabled={currentToggle === "ingredients"}
@@ -36,7 +38,9 @@ export default function BottomToggleBar() {
             Ingredients
          </Button>
          <Button
-            className={`px-4 py-2 border w-1/2 rounded-none h-full ${currentToggle === "instructions" ? "bg-primary text-primary-foreground" : ""}`}
+            className={`px-4 py-2 border w-1/2 rounded-none h-full ${
+               currentToggle === "instructions" ? "bg-primary text-primary-foreground !opacity-100" : ""
+            }`}
             variant="outline"
             onClick={() => handleClick("instructions")}
             disabled={currentToggle === "instructions"}

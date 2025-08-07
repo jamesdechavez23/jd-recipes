@@ -13,7 +13,31 @@ export type Recipe = {
    }
    time: string
    servings: number
-   ingredients: string[]
+   ingredients: RecipeIngredient[]
+   instructions: RecipeInstruction[]
    cuisine: string
    mealType: string
+}
+
+export type RecipeIngredient = {
+   name: string
+   amount: {
+      value: number | null
+      unit: string
+   }
+   category?: string
+}
+
+export type RecipeInstruction = {
+   action: string
+   description: {
+      short: string // 35 char limit
+      long: string
+   }
+   time: {
+      minutes: number
+      displayValue: string
+   }
+   heat_level: string | null
+   ingredients: RecipeIngredient[]
 }
