@@ -4,10 +4,15 @@ import Link from "next/link"
 export default function Page() {
   return (
     <main>
-      <h1>Welcome to JD-Recipes</h1>
-      <Button asChild>
-        <Link href="/register">Register</Link>
-      </Button>
+      <div className="flex flex-col items-center justify-center gap-4">
+        <h1>Welcome to JD-Recipes</h1>
+        <Button asChild>
+          <Link href="/register">Register</Link>
+        </Button>
+        <Button asChild>
+          <Link href="/login">Login</Link>
+        </Button>
+      </div>
     </main>
   )
 }

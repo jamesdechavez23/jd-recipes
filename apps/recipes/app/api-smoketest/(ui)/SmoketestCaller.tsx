@@ -1,7 +1,8 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useState, useTransition } from "react"
 import { Button } from "@repo/ui/shadcn/button"
+import type { SmoketestResult } from "../(actions)/callSmoketest"
 
 type CallState =
   | { status: "idle" }
@@ -23,59 +24,48 @@ function tryParseJson(text: string): unknown | null {
   }
 }
 
-export default function SmoketestCaller() {
-  const url = useMemo(() => {
-    const base = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").trim()
-    if (!base) return ""
+type SmoketestCallerProps = {
+  callSmoketestAction: () => Promise<SmoketestResult>
+}
 
-    return `${base.replace(/\/+$/, "")}/smoketest`
-  }, [])
+export default function SmoketestCaller({
+  callSmoketestAction
+}: SmoketestCallerProps) {
+  const [isPending, startTransition] = useTransition()
 
   const [state, setState] = useState<CallState>({ status: "idle" })
 
   async function callSmoketest() {
-    if (!url) {
-      setState({
-        status: "error",
-        message:
-          "Missing NEXT_PUBLIC_API_BASE_URL (recommended) or NEXT_PUBLIC_API_SMOKETEST_URL. Set it to your API Gateway invoke URL.",
-      })
-      return
-    }
-
     setState({ status: "loading" })
-    try {
-      const res = await fetch(url, {
-        method: "GET",
-        headers: {
-          accept: "application/json",
-        },
-      })
-
-      const bodyText = await res.text()
-      const bodyJson = tryParseJson(bodyText)
-
-      setState({
-        status: "done",
-        httpStatus: res.status,
-        ok: res.ok,
-        bodyText,
-        bodyJson,
-      })
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      setState({ status: "error", message })
-    }
+    startTransition(() => {
+      callSmoketestAction()
+        .then((res) => {
+          const bodyJson = tryParseJson(res.bodyText)
+          setState({
+            status: "done",
+            httpStatus: res.httpStatus,
+            ok: res.ok,
+            bodyText: res.bodyText,
+            bodyJson
+          })
+        })
+        .catch((err) => {
+          const message = err instanceof Error ? err.message : String(err)
+          setState({ status: "error", message })
+        })
+    })
   }
 
   return (
     <section className="flex flex-col gap-4 w-full max-w-xl">
       <div className="flex items-center gap-3 flex-wrap">
         <Button onClick={callSmoketest} disabled={state.status === "loading"}>
-          {state.status === "loading" ? "Calling…" : "Call Lambda Smoketest"}
+          {state.status === "loading" || isPending
+            ? "Calling…"
+            : "Call Lambda Smoketest"}
         </Button>
         <p className="text-sm text-muted-foreground break-all">
-          URL: {url || "(not set)"}
+          Mode: Server Action
         </p>
       </div>
 
