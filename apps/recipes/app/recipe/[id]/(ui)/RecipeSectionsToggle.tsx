@@ -4,7 +4,7 @@ import { useMemo, useState } from "react"
 import { Button } from "@repo/ui/shadcn/button"
 import { ChevronDown, ChevronUp, Tag } from "lucide-react"
 
-type TabKey = "ingredients" | "instructions"
+export type TabKey = "ingredients" | "instructions"
 
 export type DisplayIngredient = {
   ingredientId: number
@@ -24,6 +24,10 @@ export interface RecipeSectionsToggleProps {
   ingredients: DisplayIngredient[]
   instructions: unknown[]
   initialTab?: TabKey
+  onTabChange?: (tab: TabKey) => void
+  footerExtra?: React.ReactNode
+  onEditIngredient?: (ingredientId: number) => void
+  onEditInstruction?: (instructionIdx: number) => void
 }
 
 function normalizeCategory(category: string | null | undefined): string {
@@ -135,12 +139,21 @@ function normalizeInstruction(
 export default function RecipeSectionsToggle({
   ingredients,
   instructions,
-  initialTab = "instructions"
+  initialTab = "instructions",
+  onTabChange,
+  footerExtra,
+  onEditIngredient,
+  onEditInstruction
 }: RecipeSectionsToggleProps) {
   const [tab, setTab] = useState<TabKey>(initialTab)
-  const [expandedInstructionIdxs, setExpandedInstructionIdxs] = useState<
-    Set<number>
-  >(() => new Set())
+  const [expandedInstructionIdx, setExpandedInstructionIdx] = useState<
+    number | null
+  >(null)
+
+  const setTabAndNotify = (nextTab: TabKey) => {
+    setTab(nextTab)
+    onTabChange?.(nextTab)
+  }
 
   const ingredientGroups = useMemo(() => {
     const byCategory = new Map<string, DisplayIngredient[]>()
@@ -220,17 +233,32 @@ export default function RecipeSectionsToggle({
                               {ing.name}
                             </p>
 
-                            {ing.quantity !== null &&
-                            ing.quantity !== undefined &&
-                            ing.unit ? (
-                              <p className="tabular-nums font-medium whitespace-nowrap">
-                                {ing.quantity} {ing.unit}
-                              </p>
-                            ) : (
-                              <p className="text-sm text-muted-foreground">
-                                &nbsp;
-                              </p>
-                            )}
+                            <div className="flex items-center gap-3">
+                              {ing.quantity !== null &&
+                              ing.quantity !== undefined &&
+                              ing.unit ? (
+                                <p className="tabular-nums font-medium whitespace-nowrap">
+                                  {ing.quantity} {ing.unit}
+                                </p>
+                              ) : (
+                                <p className="text-sm text-muted-foreground">
+                                  &nbsp;
+                                </p>
+                              )}
+
+                              {onEditIngredient ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() =>
+                                    onEditIngredient(ing.ingredientId)
+                                  }
+                                >
+                                  Edit
+                                </Button>
+                              ) : null}
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -249,26 +277,18 @@ export default function RecipeSectionsToggle({
               <div className="flex flex-col gap-2">
                 {normalizedInstructions.map((step, idx) => {
                   const isExpandable = Boolean(step.long)
-                  const isExpanded = expandedInstructionIdxs.has(idx)
+                  const isExpanded = expandedInstructionIdx === idx
 
                   const toggle = () => {
                     if (!isExpandable) return
-                    setExpandedInstructionIdxs((prev) => {
-                      const next = new Set(prev)
-                      if (next.has(idx)) next.delete(idx)
-                      else next.add(idx)
-                      return next
-                    })
+                    setExpandedInstructionIdx((prev) =>
+                      prev === idx ? null : idx
+                    )
                   }
 
-                  const Card = isExpandable ? "button" : "div"
-
                   return (
-                    <Card
+                    <div
                       key={idx}
-                      type={isExpandable ? "button" : undefined}
-                      onClick={isExpandable ? toggle : undefined}
-                      aria-expanded={isExpandable ? isExpanded : undefined}
                       className={
                         "w-full rounded-lg border border-border bg-card p-3 text-left text-card-foreground" +
                         (isExpandable
@@ -277,32 +297,68 @@ export default function RecipeSectionsToggle({
                       }
                     >
                       <div className="flex items-start justify-between gap-4">
-                        <div className="flex flex-col gap-1">
-                          <p className="font-medium leading-tight">
-                            {idx + 1}. {step.short}
-                          </p>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            {step.timeMinutes ? (
-                              <span className="inline-flex items-center rounded-full border border-border px-2 py-0.5">
-                                {step.timeMinutes} min
-                              </span>
-                            ) : null}
-                            {step.heat ? (
-                              <span className="inline-flex items-center rounded-full border border-border px-2 py-0.5">
-                                {step.heat}
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-
                         {isExpandable ? (
-                          <div className="pt-0.5 text-muted-foreground">
-                            {isExpanded ? (
-                              <ChevronUp className="h-4 w-4" />
-                            ) : (
-                              <ChevronDown className="h-4 w-4" />
-                            )}
+                          <button
+                            type="button"
+                            onClick={toggle}
+                            aria-expanded={isExpanded}
+                            className="flex flex-1 items-start justify-between gap-4 text-left"
+                          >
+                            <div className="flex flex-col gap-1">
+                              <p className="font-medium leading-tight">
+                                {idx + 1}. {step.short}
+                              </p>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                {step.timeMinutes ? (
+                                  <span className="inline-flex items-center rounded-full border border-border px-2 py-0.5">
+                                    {step.timeMinutes} min
+                                  </span>
+                                ) : null}
+                                {step.heat ? (
+                                  <span className="inline-flex items-center rounded-full border border-border px-2 py-0.5">
+                                    {step.heat}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+
+                            <div className="pt-0.5 text-muted-foreground">
+                              {isExpanded ? (
+                                <ChevronUp className="h-4 w-4" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4" />
+                              )}
+                            </div>
+                          </button>
+                        ) : (
+                          <div className="flex flex-1 flex-col gap-1">
+                            <p className="font-medium leading-tight">
+                              {idx + 1}. {step.short}
+                            </p>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              {step.timeMinutes ? (
+                                <span className="inline-flex items-center rounded-full border border-border px-2 py-0.5">
+                                  {step.timeMinutes} min
+                                </span>
+                              ) : null}
+                              {step.heat ? (
+                                <span className="inline-flex items-center rounded-full border border-border px-2 py-0.5">
+                                  {step.heat}
+                                </span>
+                              ) : null}
+                            </div>
                           </div>
+                        )}
+
+                        {onEditInstruction ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => onEditInstruction(idx)}
+                          >
+                            Edit
+                          </Button>
                         ) : null}
                       </div>
 
@@ -348,7 +404,7 @@ export default function RecipeSectionsToggle({
                           ) : null}
                         </div>
                       ) : null}
-                    </Card>
+                    </div>
                   )
                 })}
               </div>
@@ -365,7 +421,7 @@ export default function RecipeSectionsToggle({
             type="button"
             className="flex-1"
             variant={tab === "instructions" ? "default" : "secondary"}
-            onClick={() => setTab("instructions")}
+            onClick={() => setTabAndNotify("instructions")}
           >
             Instructions
           </Button>
@@ -373,10 +429,11 @@ export default function RecipeSectionsToggle({
             type="button"
             className="flex-1"
             variant={tab === "ingredients" ? "default" : "secondary"}
-            onClick={() => setTab("ingredients")}
+            onClick={() => setTabAndNotify("ingredients")}
           >
             Ingredients
           </Button>
+          {footerExtra ? <div className="shrink-0">{footerExtra}</div> : null}
         </div>
       </div>
     </>

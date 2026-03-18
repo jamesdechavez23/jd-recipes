@@ -17,6 +17,7 @@ export type RecipeById = {
   id: number
   name: string
   description: string | null
+  video?: string | null
   instructions: unknown
   ingredients: RecipeIngredient[]
 }
@@ -74,7 +75,7 @@ export default async function getRecipeById({
   if (bodyJson && typeof bodyJson === "object" && bodyJson !== null) {
     // Expecting { ok: true, recipe: ... }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const recipe = (bodyJson as any).recipe
+    const recipe = (bodyJson as any).recipe ?? bodyJson
     if (recipe && typeof recipe === "object") {
       return recipe as RecipeById
     }

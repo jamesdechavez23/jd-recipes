@@ -5,7 +5,7 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "tunnel": "node scripts/ssm-tunnel.js",
-    "dev:tunnel": "concurrently -k \"npm run tunnel\" \"npm run dev\"",
+    "dev:tunnel": "concurrently --kill-others-on-fail \"npm run tunnel\" \"npm run dev\"",
     "lint": "turbo run lint",
     "check-types": "turbo run check-types",
     "format": "prettier --write \"**/*.{ts,tsx,md}\""

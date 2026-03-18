@@ -3,12 +3,21 @@
 import "server-only"
 
 import { cookies } from "next/headers"
+import { redirect } from "next/navigation"
 import { ID_TOKEN_COOKIE_NAME } from "@recipes/utils/authCookies"
 
 export type CreateRecipeActionState =
   | { status: "idle" }
   | { status: "success"; recipe: unknown }
   | { status: "error"; message: string; httpStatus?: number }
+
+function tryGetRecipeId(recipe: unknown): number | null {
+  if (!recipe || typeof recipe !== "object") return null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anyRecipe = recipe as any
+  const id = Number(anyRecipe.id ?? anyRecipe.recipeId)
+  return Number.isInteger(id) && id > 0 ? id : null
+}
 
 function getRequiredEnv(name: string) {
   const value = process.env[name]
@@ -29,24 +38,155 @@ function parseInstructions(raw: string): string[] {
     .filter(Boolean)
 }
 
-function parseIngredientIds(entries: FormDataEntryValue[]): number[] {
-  const ids: number[] = []
+type RecipeStepIngredientInput = {
+  ingredientId: number
+  quantity?: number | null
+  unit?: string | null
+}
 
-  for (const entry of entries) {
-    if (typeof entry !== "string") continue
-    const parsed = Number.parseInt(entry, 10)
-    if (!Number.isInteger(parsed)) continue
-    if (parsed <= 0) continue
-    ids.push(parsed)
-  }
-
-  return Array.from(new Set(ids))
+type RecipeStepInput = {
+  step: number
+  short_desc?: string
+  long_desc?: string
+  heat?: string
+  time_minutes?: number | null
+  step_instructions?: RecipeStepIngredientInput[]
 }
 
 type RecipeIngredientInput = {
   ingredientId: number
   quantity?: number | null
   unit?: string | null
+}
+
+function parseInstructionsJson(
+  raw: string
+): { ok: true; value: RecipeStepInput[] } | { ok: false; error: string } {
+  if (!raw) return { ok: true, value: [] }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return { ok: false, error: "Instructions payload is not valid JSON" }
+  }
+
+  if (!Array.isArray(parsed)) {
+    return { ok: false, error: "Instructions payload must be an array" }
+  }
+
+  const out: RecipeStepInput[] = []
+
+  for (let idx = 0; idx < parsed.length; idx++) {
+    const item = parsed[idx]
+    if (!item || typeof item !== "object") {
+      return {
+        ok: false,
+        error: "Instructions payload contains an invalid item"
+      }
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const anyItem = item as any
+
+    const step = Number(anyItem.step ?? idx + 1)
+    if (!Number.isInteger(step) || step <= 0) {
+      return { ok: false, error: "Each instruction must have a valid step" }
+    }
+
+    const timeRaw = anyItem.time_minutes
+    let time_minutes: number | null | undefined = undefined
+    if (timeRaw === "" || timeRaw === null || timeRaw === undefined) {
+      time_minutes = null
+    } else if (timeRaw !== undefined) {
+      const t = typeof timeRaw === "number" ? timeRaw : Number(timeRaw)
+      if (!Number.isFinite(t)) {
+        return { ok: false, error: "time_minutes must be a number" }
+      }
+      time_minutes = t
+    }
+
+    const siRaw = anyItem.step_instructions
+    let step_instructions: RecipeStepIngredientInput[] | undefined = undefined
+    if (siRaw !== undefined) {
+      if (!Array.isArray(siRaw)) {
+        return {
+          ok: false,
+          error: "step_instructions must be an array when provided"
+        }
+      }
+
+      const parsedStepIngredients: RecipeStepIngredientInput[] = []
+      for (const si of siRaw) {
+        if (!si || typeof si !== "object") {
+          return {
+            ok: false,
+            error: "step_instructions contains an invalid item"
+          }
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const anySi = si as any
+
+        const ingredientId = Number(anySi.ingredientId)
+        if (!Number.isInteger(ingredientId) || ingredientId <= 0) {
+          return {
+            ok: false,
+            error: "Each step ingredient must have a valid ingredientId"
+          }
+        }
+
+        const quantityRaw = anySi.quantity
+        let quantity: number | null = null
+        if (
+          quantityRaw !== undefined &&
+          quantityRaw !== null &&
+          quantityRaw !== ""
+        ) {
+          const q =
+            typeof quantityRaw === "number" ? quantityRaw : Number(quantityRaw)
+          if (!Number.isFinite(q)) {
+            return {
+              ok: false,
+              error: "Step ingredient quantity must be a number"
+            }
+          }
+          quantity = q
+        }
+
+        const unitRaw = anySi.unit
+        const unit = typeof unitRaw === "string" ? unitRaw.trim() : ""
+
+        if (quantity !== null && !unit) {
+          return {
+            ok: false,
+            error: "Unit is required when quantity is provided"
+          }
+        }
+
+        parsedStepIngredients.push({
+          ingredientId,
+          quantity,
+          unit: unit || null
+        })
+      }
+
+      step_instructions = parsedStepIngredients
+    }
+
+    out.push({
+      step,
+      short_desc:
+        typeof anyItem.short_desc === "string" ? anyItem.short_desc : undefined,
+      long_desc:
+        typeof anyItem.long_desc === "string" ? anyItem.long_desc : undefined,
+      heat: typeof anyItem.heat === "string" ? anyItem.heat : undefined,
+      time_minutes,
+      step_instructions
+    })
+  }
+
+  return { ok: true, value: out }
 }
 
 function parseIngredientsJson(
@@ -147,8 +287,20 @@ export default async function createRecipeAction(
 
   const name = asTrimmedString(formData.get("name"))
   const description = asTrimmedString(formData.get("description"))
-  const instructionsText = asTrimmedString(formData.get("instructions"))
-  const instructions = parseInstructions(instructionsText)
+  const videoUrl = asTrimmedString(formData.get("videoUrl"))
+  const instructionsJson = asTrimmedString(formData.get("instructionsJson"))
+  const instructionsParsed = parseInstructionsJson(instructionsJson)
+  if (!instructionsParsed.ok) {
+    return { status: "error", message: instructionsParsed.error }
+  }
+
+  const instructionsLegacyText = asTrimmedString(formData.get("instructions"))
+  const instructionsLegacy = parseInstructions(instructionsLegacyText)
+  const instructions =
+    instructionsParsed.value.length > 0
+      ? instructionsParsed.value
+      : instructionsLegacy
+
   const ingredientsJson = asTrimmedString(formData.get("ingredientsJson"))
   const ingredientsParsed = parseIngredientsJson(ingredientsJson)
   if (!ingredientsParsed.ok) {
@@ -156,13 +308,16 @@ export default async function createRecipeAction(
   }
 
   const ingredients = ingredientsParsed.value
-  const ingredientIds =
-    ingredients.length === 0
-      ? parseIngredientIds(formData.getAll("ingredientIds"))
-      : []
 
   if (!name) {
     return { status: "error", message: "Name is required." }
+  }
+
+  if (instructions.length === 0) {
+    return {
+      status: "error",
+      message: "At least one instruction is required."
+    }
   }
 
   const base = getRequiredEnv("NEXT_PUBLIC_API_BASE_URL").replace(/\/+$/, "")
@@ -171,10 +326,13 @@ export default async function createRecipeAction(
   const payload = {
     name,
     description: description || undefined,
+    videoUrl: videoUrl || undefined,
     instructions,
-    ingredients: ingredients.length > 0 ? ingredients : undefined,
-    ingredientIds: ingredientIds.length > 0 ? ingredientIds : undefined
+    ingredients: ingredients.length > 0 ? ingredients : undefined
   }
+
+  let recipeId: number | null = null
+  let createdRecipe: unknown = null
 
   try {
     const res = await fetch(url, {
@@ -216,12 +374,23 @@ export default async function createRecipeAction(
     if (bodyJson && typeof bodyJson === "object" && bodyJson !== null) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const recipe = (bodyJson as any).recipe ?? bodyJson
-      return { status: "success", recipe }
+      createdRecipe = recipe
+      recipeId = tryGetRecipeId(recipe)
+    } else {
+      createdRecipe = bodyText
     }
-
-    return { status: "success", recipe: bodyText }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return { status: "error", message }
+  }
+
+  if (recipeId) {
+    redirect(`/recipe/${recipeId}`)
+  }
+
+  return {
+    status: "error",
+    message:
+      "Recipe created, but the API response did not include an id to redirect to."
   }
 }

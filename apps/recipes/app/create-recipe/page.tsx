@@ -1,5 +1,6 @@
 import CreateRecipeForm from "./(ui)/CreateRecipeForm"
 import createRecipeAction from "./(actions)/createRecipeAction"
+import createIngredientAction from "./(actions)/createIngredientAction"
 import {
   getIngredients,
   type IngredientListItem
@@ -16,10 +17,10 @@ export default async function CreateRecipePage() {
   }
 
   return (
-    <main className="flex flex-col gap-6 p-8">
-      <h1 className="text-2xl font-bold">Create Recipe</h1>
+    <main className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
       <CreateRecipeForm
         createRecipeAction={createRecipeAction}
+        createIngredientAction={createIngredientAction}
         ingredients={ingredients}
         ingredientsError={ingredientsError}
       />

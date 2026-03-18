@@ -104,7 +104,7 @@ exports.handler = async (event, context) => {
     const pool = await getPool()
 
     const recipeResult = await pool.query(
-      "select id, name, description, instructions, created_at, updated_at from recipes where id = $1",
+      'select id, name, description, video_url as "video", created_at, updated_at from recipes where id = $1',
       [recipeId]
     )
 
@@ -118,11 +118,52 @@ exports.handler = async (event, context) => {
       [recipeId]
     )
 
+    const stepsResult = await pool.query(
+      'select id, step_number as "step", short_desc, long_desc, heat, time_minutes from recipe_steps where recipe_id = $1 order by step_number asc',
+      [recipeId]
+    )
+
+    const stepIngredientsResult = await pool.query(
+      'select rsi.recipe_step_id as "recipeStepId", rsi.ingredient_id as "ingredientId", rsi.quantity, rsi.unit from recipe_step_ingredients rsi join recipe_steps rs on rs.id = rsi.recipe_step_id where rs.recipe_id = $1 order by rs.step_number asc, rsi.ingredient_id asc',
+      [recipeId]
+    )
+
+    const stepIngredientsByStepId = new Map()
+    for (const row of stepIngredientsResult.rows) {
+      const key = row.recipeStepId
+      const list = stepIngredientsByStepId.get(key)
+      if (list)
+        list.push({
+          ingredientId: row.ingredientId,
+          quantity: row.quantity,
+          unit: row.unit
+        })
+      else {
+        stepIngredientsByStepId.set(key, [
+          {
+            ingredientId: row.ingredientId,
+            quantity: row.quantity,
+            unit: row.unit
+          }
+        ])
+      }
+    }
+
+    const instructions = stepsResult.rows.map((s) => ({
+      step: s.step,
+      short_desc: s.short_desc,
+      long_desc: s.long_desc,
+      heat: s.heat,
+      time_minutes: s.time_minutes,
+      step_instructions: stepIngredientsByStepId.get(s.id) || []
+    }))
+
     return jsonResponse(200, {
       ok: true,
       recipe: {
         ...recipe,
-        ingredients: ingredientsResult.rows
+        ingredients: ingredientsResult.rows,
+        instructions
       }
     })
   } catch (err) {

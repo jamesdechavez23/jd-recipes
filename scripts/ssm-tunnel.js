@@ -2,6 +2,10 @@ const fs = require("fs")
 const path = require("path")
 const { spawn } = require("child_process")
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 function readDotEnv(filePath) {
   const env = {}
   let text
@@ -155,41 +159,94 @@ function main() {
     `host=${host},portNumber=${remotePort},localPortNumber=${localPort}`
   ]
 
-  console.log(
-    `Starting SSM tunnel: localhost:${localPort} -> ${host}:${remotePort} (instance ${target}, region ${region})`
-  )
-  console.log("Leave this process running while you use DataGrip.")
+  let activeChild = null
+  let stopping = false
 
-  const child = spawn(getAwsExecutable(), args, {
-    stdio: "inherit",
-    env: process.env
-  })
+  const stop = () => {
+    if (stopping) return
+    stopping = true
+    if (activeChild) {
+      try {
+        activeChild.kill("SIGTERM")
+      } catch {
+        // Ignore.
+      }
+    }
+  }
 
-  child.on("exit", (code) => {
-    process.exit(code ?? 0)
-  })
+  process.once("SIGINT", stop)
+  process.once("SIGTERM", stop)
 
-  child.on("error", (err) => {
-    const message = err?.message ?? String(err)
-    console.error("Failed to start AWS CLI:", message)
-
-    if (String(message).includes("ENOENT")) {
-      console.error(
-        "AWS CLI was not found. Install AWS CLI v2, then reopen your terminal so PATH updates."
+  const startSessionOnce = () =>
+    new Promise((resolve, reject) => {
+      console.log(
+        `Starting SSM tunnel: localhost:${localPort} -> ${host}:${remotePort} (instance ${target}, region ${region})`
       )
-      console.error(
-        "Windows default install path is usually: C:\\Program Files\\Amazon\\AWSCLIV2\\aws.exe"
-      )
-      console.error(
-        "If it is installed but not on PATH, set AWS_CLI_PATH to that full path."
-      )
+      console.log("Leave this process running while you develop.")
+
+      activeChild = spawn(getAwsExecutable(), args, {
+        stdio: "inherit",
+        env: process.env
+      })
+
+      activeChild.on("exit", (code, signal) => {
+        activeChild = null
+        resolve({ code, signal })
+      })
+
+      activeChild.on("error", (err) => {
+        activeChild = null
+        reject(err)
+      })
+    })
+
+  ;(async () => {
+    let backoffMs = 1000
+    const maxBackoffMs = 30000
+
+    while (!stopping) {
+      const startedAt = Date.now()
+      try {
+        const { code, signal } = await startSessionOnce()
+
+        if (stopping) break
+
+        const durationMs = Date.now() - startedAt
+        if (durationMs > 30000) {
+          backoffMs = 1000
+        }
+
+        const reason = signal ? `signal ${signal}` : `code ${code ?? 0}`
+        console.log(
+          `SSM session ended (${reason}). Reconnecting in ${Math.ceil(backoffMs / 1000)}s...`
+        )
+        await sleep(backoffMs)
+        backoffMs = Math.min(backoffMs * 2, maxBackoffMs)
+      } catch (err) {
+        const message = err?.message ?? String(err)
+        console.error("Failed to start AWS CLI:", message)
+
+        if (String(message).includes("ENOENT")) {
+          console.error(
+            "AWS CLI was not found. Install AWS CLI v2, then reopen your terminal so PATH updates."
+          )
+          console.error(
+            "Windows default install path is usually: C:\\Program Files\\Amazon\\AWSCLIV2\\aws.exe"
+          )
+          console.error(
+            "If it is installed but not on PATH, set AWS_CLI_PATH to that full path."
+          )
+        }
+
+        console.error(
+          "Also ensure the Session Manager Plugin is installed (required for `aws ssm start-session`)."
+        )
+        process.exit(1)
+      }
     }
 
-    console.error(
-      "Also ensure the Session Manager Plugin is installed (required for `aws ssm start-session`)."
-    )
-    process.exit(1)
-  })
+    process.exit(0)
+  })()
 }
 
 main()

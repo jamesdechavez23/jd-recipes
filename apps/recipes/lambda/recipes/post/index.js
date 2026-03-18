@@ -171,6 +171,144 @@ function parseIngredients(value) {
   return { ok: true, value: unique }
 }
 
+function parseSteps(value) {
+  if (value === undefined || value === null) return { ok: true, value: [] }
+  if (!Array.isArray(value)) {
+    return { ok: false, error: "Field 'instructions' must be an array" }
+  }
+
+  const steps = []
+
+  for (let i = 0; i < value.length; i++) {
+    const raw = value[i]
+
+    // Allow string steps for convenience
+    if (typeof raw === "string") {
+      const text = raw.trim()
+      if (!text) continue
+      steps.push({
+        step: steps.length + 1,
+        short_desc: text,
+        long_desc: null,
+        heat: null,
+        time_minutes: null,
+        step_instructions: []
+      })
+      continue
+    }
+
+    if (!raw || typeof raw !== "object") {
+      return {
+        ok: false,
+        error: "Each instruction must be an object or string"
+      }
+    }
+
+    const step = Number(raw.step)
+    const stepNumber =
+      Number.isInteger(step) && step > 0 ? step : steps.length + 1
+
+    const short =
+      raw.short_desc === undefined || raw.short_desc === null
+        ? ""
+        : String(raw.short_desc).trim()
+    const long =
+      raw.long_desc === undefined || raw.long_desc === null
+        ? ""
+        : String(raw.long_desc).trim()
+
+    const heat =
+      raw.heat === undefined || raw.heat === null
+        ? null
+        : String(raw.heat).trim() || null
+
+    const timeRaw = raw.time_minutes
+    let timeMinutes = null
+    if (timeRaw !== undefined && timeRaw !== null && timeRaw !== "") {
+      const parsed = Number(timeRaw)
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        return {
+          ok: false,
+          error: "Instruction time_minutes must be a non-negative number"
+        }
+      }
+      timeMinutes = Math.trunc(parsed)
+    }
+
+    const stepIngredientsRaw = raw.step_instructions
+    const stepIngredients = []
+    if (stepIngredientsRaw !== undefined && stepIngredientsRaw !== null) {
+      if (!Array.isArray(stepIngredientsRaw)) {
+        return {
+          ok: false,
+          error: "Field 'step_instructions' must be an array"
+        }
+      }
+
+      for (const si of stepIngredientsRaw) {
+        if (!si || typeof si !== "object") {
+          return {
+            ok: false,
+            error: "step_instructions contains an invalid item"
+          }
+        }
+
+        const ingredientId = Number(si.ingredientId)
+        if (!Number.isInteger(ingredientId) || ingredientId <= 0) {
+          return {
+            ok: false,
+            error: "Each step ingredient must have a valid ingredientId"
+          }
+        }
+
+        let quantity = null
+        if (
+          si.quantity !== undefined &&
+          si.quantity !== null &&
+          si.quantity !== ""
+        ) {
+          const q = Number(si.quantity)
+          if (!Number.isFinite(q)) {
+            return {
+              ok: false,
+              error: "Step ingredient quantity must be a number"
+            }
+          }
+          quantity = q
+        }
+
+        const unit =
+          si.unit === undefined || si.unit === null
+            ? null
+            : String(si.unit).trim() || null
+
+        if (quantity !== null && !unit) {
+          return {
+            ok: false,
+            error: "Unit is required when step ingredient quantity is provided"
+          }
+        }
+
+        stepIngredients.push({ ingredientId, quantity, unit })
+      }
+    }
+
+    steps.push({
+      step: stepNumber,
+      short_desc: short || `Step ${stepNumber}`,
+      long_desc: long || null,
+      heat,
+      time_minutes: timeMinutes,
+      step_instructions: stepIngredients
+    })
+  }
+
+  // Sort by step (stable enough for typical inputs)
+  steps.sort((a, b) => a.step - b.step)
+
+  return { ok: true, value: steps }
+}
+
 exports.handler = async (event, context) => {
   // Allow the function to return without waiting for the pg pool to fully close.
   context.callbackWaitsForEmptyEventLoop = false
@@ -202,18 +340,17 @@ exports.handler = async (event, context) => {
       ? null
       : String(descriptionRaw).trim()
 
-  const instructionsRaw = parsed.value?.instructions
-  const instructions =
-    instructionsRaw === undefined || instructionsRaw === null
-      ? []
-      : instructionsRaw
+  const videoRaw = parsed.value?.videoUrl ?? parsed.value?.video
+  const videoUrl =
+    videoRaw === undefined || videoRaw === null
+      ? null
+      : String(videoRaw).trim() || null
 
-  if (!Array.isArray(instructions)) {
-    return jsonResponse(400, {
-      ok: false,
-      error: "Field 'instructions' must be an array"
-    })
+  const stepsParsed = parseSteps(parsed.value?.instructions)
+  if (!stepsParsed.ok) {
+    return jsonResponse(400, { ok: false, error: stepsParsed.error })
   }
+  const steps = stepsParsed.value
 
   const ingredientsParsed = parseIngredients(parsed.value?.ingredients)
   if (!ingredientsParsed.ok) {
@@ -230,9 +367,9 @@ exports.handler = async (event, context) => {
   const ingredientIds = ingredientIdsParsed.value
 
   // Matches db/tables/recipes.sql:
-  // recipes(name varchar not null, description text, instructions jsonb not null default '[]')
+  // recipes(name varchar not null, description text, video_url text)
   const sql =
-    "insert into recipes (name, description, instructions) values ($1, $2, $3::jsonb) returning *"
+    "insert into recipes (name, description, video_url) values ($1, $2, $3) returning *"
 
   try {
     const pool = await getPool()
@@ -240,11 +377,7 @@ exports.handler = async (event, context) => {
     try {
       await client.query("begin")
 
-      const result = await client.query(sql, [
-        name,
-        description,
-        JSON.stringify(instructions)
-      ])
+      const result = await client.query(sql, [name, description, videoUrl])
       const recipe = result.rows[0] ?? null
 
       if (!recipe) {
@@ -263,6 +396,37 @@ exports.handler = async (event, context) => {
           "insert into recipe_ingredients (recipe_id, ingredient_id) select $1, unnest($2::int[]) on conflict do nothing",
           [recipe.id, ingredientIds]
         )
+      }
+
+      if (steps.length > 0) {
+        for (const s of steps) {
+          const stepRes = await client.query(
+            "insert into recipe_steps (recipe_id, step_number, short_desc, long_desc, heat, time_minutes) values ($1, $2, $3, $4, $5, $6) returning id",
+            [
+              recipe.id,
+              s.step,
+              s.short_desc,
+              s.long_desc,
+              s.heat,
+              s.time_minutes
+            ]
+          )
+          const recipeStepId = stepRes.rows[0]?.id
+          if (!recipeStepId)
+            throw new Error("Insert step succeeded but returned no id")
+
+          if (
+            Array.isArray(s.step_instructions) &&
+            s.step_instructions.length > 0
+          ) {
+            for (const si of s.step_instructions) {
+              await client.query(
+                "insert into recipe_step_ingredients (recipe_step_id, ingredient_id, quantity, unit) values ($1, $2, $3, $4) on conflict (recipe_step_id, ingredient_id) do update set quantity = excluded.quantity, unit = excluded.unit",
+                [recipeStepId, si.ingredientId, si.quantity, si.unit]
+              )
+            }
+          }
+        }
       }
 
       await client.query("commit")
