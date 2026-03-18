@@ -73,7 +73,9 @@ function parseRecipeId(event) {
   }
 
   const rawPath = event?.rawPath || event?.path || ""
-  const match = /\/recipes\/(\d+)/.exec(rawPath)
+  const match =
+    /\/recipes\/(\d+)(?:\/|$)/.exec(rawPath) ||
+    /\/recipe\/(\d+)(?:\/|$)/.exec(rawPath)
   if (match) {
     const id = Number(match[1])
     if (Number.isInteger(id) && id > 0) return { ok: true, value: id }

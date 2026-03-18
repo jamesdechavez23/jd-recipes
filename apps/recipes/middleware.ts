@@ -56,7 +56,7 @@ export async function middleware(req: NextRequest) {
     }
 
     if (isPublicPath) {
-      return NextResponse.redirect(`${redirectOrigin}/recipes`)
+      return NextResponse.redirect(`${redirectOrigin}/recipe`)
     }
     return NextResponse.next()
   } catch {

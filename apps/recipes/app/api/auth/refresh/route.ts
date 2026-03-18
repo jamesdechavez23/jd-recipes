@@ -19,9 +19,9 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 function safeRedirectPath(value: string | null) {
-  if (!value) return "/recipes"
-  if (!value.startsWith("/")) return "/recipes"
-  if (value.startsWith("//")) return "/recipes"
+  if (!value) return "/recipe"
+  if (!value.startsWith("/")) return "/recipe"
+  if (value.startsWith("//")) return "/recipe"
   return value
 }
 

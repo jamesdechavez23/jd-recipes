@@ -13,7 +13,7 @@ import { Button } from "@repo/ui/shadcn/button"
 import RecipeSectionsToggle, {
   type DisplayIngredient,
   type TabKey
-} from "../../recipe/[id]/(ui)/RecipeSectionsToggle"
+} from "../../[id]/(ui)/RecipeSectionsToggle"
 import type { IngredientListItem } from "../(actions)/getIngredients"
 import type { CreateRecipeActionState } from "../(actions)/createRecipeAction"
 import type { CreateIngredientActionState } from "../(actions)/createIngredientAction"

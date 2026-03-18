@@ -1,0 +1,17 @@
+{
+  "name": "lambda-recipes-get-mine",
+  "version": "1.0.0",
+  "description": "List current user's recipes (GET /recipes/mine)",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.1007.0",
+    "pg": "^8.20.0"
+  }
+}

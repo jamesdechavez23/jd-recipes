@@ -2,6 +2,7 @@ import "@repo/ui/styles.css"
 import "@recipes/ui/globals.css"
 import type { Metadata } from "next"
 import { cookies } from "next/headers"
+import Link from "next/link"
 
 import { Button } from "@repo/ui/shadcn/button"
 
@@ -21,19 +22,29 @@ export default async function RootLayout({
 }) {
   const cookieStore = await cookies()
   const isAuthed = Boolean(cookieStore.get(ACCESS_TOKEN_COOKIE_NAME)?.value)
+  const homeHref = isAuthed ? "/recipe" : "/"
 
   return (
     <html lang="en">
       <body>
-        <header className="p-4 flex items-center justify-end gap-2">
-          <ThemeToggle />
-          {isAuthed ? (
-            <form action={signOutAction}>
-              <Button variant="outline" type="submit">
-                Sign out
-              </Button>
-            </form>
-          ) : null}
+        <header className="p-4 flex items-center justify-between gap-2 border-b">
+          <Link
+            href={homeHref}
+            className="text-lg font-bold tracking-tight"
+            aria-label="JD-Recipes"
+          >
+            JD-Recipes
+          </Link>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            {isAuthed ? (
+              <form action={signOutAction}>
+                <Button variant="outline" type="submit">
+                  Sign out
+                </Button>
+              </form>
+            ) : null}
+          </div>
         </header>
         {children}
       </body>

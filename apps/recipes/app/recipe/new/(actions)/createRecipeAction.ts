@@ -321,7 +321,7 @@ export default async function createRecipeAction(
   }
 
   const base = getRequiredEnv("NEXT_PUBLIC_API_BASE_URL").replace(/\/+$/, "")
-  const url = `${base}/recipes`
+  const url = `${base}/recipe`
 
   const payload = {
     name,

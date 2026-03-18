@@ -63,6 +63,18 @@ function jsonResponse(statusCode, body) {
   }
 }
 
+function getUserSub(event) {
+  const claims =
+    event?.requestContext?.authorizer?.jwt?.claims ||
+    event?.requestContext?.authorizer?.claims ||
+    null
+
+  const sub = claims?.sub
+  if (sub) return String(sub)
+
+  return null
+}
+
 function parseJsonBody(event) {
   if (!event?.body) return { ok: false, error: "Missing request body" }
 
@@ -326,6 +338,14 @@ exports.handler = async (event, context) => {
     return jsonResponse(400, { ok: false, error: parsed.error })
   }
 
+  const createdBySub = getUserSub(event)
+  if (!createdBySub) {
+    return jsonResponse(401, {
+      ok: false,
+      error: "Unauthorized (missing user identity)"
+    })
+  }
+
   const name = String(parsed.value?.name ?? "").trim()
   if (!name) {
     return jsonResponse(400, {
@@ -367,9 +387,9 @@ exports.handler = async (event, context) => {
   const ingredientIds = ingredientIdsParsed.value
 
   // Matches db/tables/recipes.sql:
-  // recipes(name varchar not null, description text, video_url text)
+  // recipes(created_by_sub uuid not null, name varchar not null, description text, video_url text)
   const sql =
-    "insert into recipes (name, description, video_url) values ($1, $2, $3) returning *"
+    "insert into recipes (created_by_sub, name, description, video_url) values ($1, $2, $3, $4) returning *"
 
   try {
     const pool = await getPool()
@@ -377,7 +397,12 @@ exports.handler = async (event, context) => {
     try {
       await client.query("begin")
 
-      const result = await client.query(sql, [name, description, videoUrl])
+      const result = await client.query(sql, [
+        createdBySub,
+        name,
+        description,
+        videoUrl
+      ])
       const recipe = result.rows[0] ?? null
 
       if (!recipe) {

@@ -15,7 +15,7 @@ export default async function CognitoLoginPage({
           Registration successful! Please log in.
         </p>
       )}
-      <LoginForm redirectTo={redirect ?? "/recipes"} />
+      <LoginForm redirectTo={redirect ?? "/recipe"} />
     </div>
   )
 }
