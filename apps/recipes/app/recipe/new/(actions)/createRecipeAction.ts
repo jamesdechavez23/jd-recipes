@@ -2,6 +2,7 @@
 
 import "server-only"
 
+import { revalidatePath } from "next/cache"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { ID_TOKEN_COOKIE_NAME } from "@recipes/utils/authCookies"
@@ -41,6 +42,7 @@ function parseInstructions(raw: string): string[] {
 type RecipeStepIngredientInput = {
   ingredientId: number
   quantity?: number | null
+  quantity_display?: string | null
   unit?: string | null
 }
 
@@ -56,6 +58,7 @@ type RecipeStepInput = {
 type RecipeIngredientInput = {
   ingredientId: number
   quantity?: number | null
+  quantity_display?: string | null
   unit?: string | null
 }
 
@@ -156,6 +159,11 @@ function parseInstructionsJson(
 
         const unitRaw = anySi.unit
         const unit = typeof unitRaw === "string" ? unitRaw.trim() : ""
+        const quantityDisplayRaw = anySi.quantity_display
+        const quantity_display =
+          typeof quantityDisplayRaw === "string"
+            ? quantityDisplayRaw.trim() || null
+            : null
 
         if (quantity !== null && !unit) {
           return {
@@ -167,6 +175,7 @@ function parseInstructionsJson(
         parsedStepIngredients.push({
           ingredientId,
           quantity,
+          quantity_display,
           unit: unit || null
         })
       }
@@ -243,6 +252,11 @@ function parseIngredientsJson(
 
     const unitRaw = anyItem.unit
     const unit = typeof unitRaw === "string" ? unitRaw.trim() : ""
+    const quantityDisplayRaw = anyItem.quantity_display
+    const quantity_display =
+      typeof quantityDisplayRaw === "string"
+        ? quantityDisplayRaw.trim() || null
+        : null
 
     if (quantity !== null && !unit) {
       return {
@@ -254,6 +268,7 @@ function parseIngredientsJson(
     out.push({
       ingredientId,
       quantity,
+      quantity_display,
       unit: unit || null
     })
   }
@@ -321,7 +336,7 @@ export default async function createRecipeAction(
   }
 
   const base = getRequiredEnv("NEXT_PUBLIC_API_BASE_URL").replace(/\/+$/, "")
-  const url = `${base}/recipe`
+  const url = `${base}/recipes`
 
   const payload = {
     name,
@@ -385,6 +400,8 @@ export default async function createRecipeAction(
   }
 
   if (recipeId) {
+    revalidatePath("/recipe", "layout")
+    revalidatePath(`/recipe/${recipeId}`)
     redirect(`/recipe/${recipeId}`)
   }
 

@@ -2,8 +2,10 @@
 
 import "server-only"
 
-import { cookies } from "next/headers"
-import { ID_TOKEN_COOKIE_NAME } from "@recipes/utils/authCookies"
+import {
+  AdminAccessError,
+  requireAdminAccessToken
+} from "@recipes/utils/requireAdmin"
 
 function getRequiredEnv(name: string) {
   const value = process.env[name]
@@ -18,15 +20,18 @@ export type SmoketestResult = {
 }
 
 export default async function callSmoketest(): Promise<SmoketestResult> {
-  const cookieStore = await cookies()
-  const idToken = cookieStore.get(ID_TOKEN_COOKIE_NAME)?.value
-
-  if (!idToken) {
-    return {
-      httpStatus: 401,
-      ok: false,
-      bodyText: JSON.stringify({ ok: false, error: "Missing id token cookie" })
+  let accessToken: string
+  try {
+    ;({ accessToken } = await requireAdminAccessToken())
+  } catch (error) {
+    if (error instanceof AdminAccessError) {
+      return {
+        httpStatus: error.httpStatus,
+        ok: false,
+        bodyText: JSON.stringify({ ok: false, error: error.message })
+      }
     }
+    throw error
   }
 
   const base = getRequiredEnv("NEXT_PUBLIC_API_BASE_URL").replace(/\/+$/, "")
@@ -36,7 +41,7 @@ export default async function callSmoketest(): Promise<SmoketestResult> {
     method: "GET",
     headers: {
       accept: "application/json",
-      authorization: `Bearer ${idToken}`
+      authorization: `Bearer ${accessToken}`
     },
     cache: "no-store"
   })

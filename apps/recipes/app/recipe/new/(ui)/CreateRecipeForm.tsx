@@ -10,13 +10,29 @@ import {
 } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@repo/ui/shadcn/button"
+import ConfirmResetDialog from "./create-recipe-form/ConfirmResetDialog"
+import CreateIngredientSheet from "./create-recipe-form/CreateIngredientSheet"
+import IngredientEditorSheet from "./create-recipe-form/IngredientEditorSheet"
+import InstructionEditorSheet from "./create-recipe-form/InstructionEditorSheet"
 import RecipeSectionsToggle, {
   type DisplayIngredient,
   type TabKey
 } from "../../[id]/(ui)/RecipeSectionsToggle"
+import type {
+  BuilderIngredient,
+  BuilderInstruction
+} from "./create-recipe-form/types"
+import {
+  getNextInstructionId,
+  normalizeCategory,
+  parseQuantityInput,
+  renumberInstructions,
+  toYoutubeEmbedUrl
+} from "./create-recipe-form/utils"
 import type { IngredientListItem } from "../(actions)/getIngredients"
 import type { CreateRecipeActionState } from "../(actions)/createRecipeAction"
 import type { CreateIngredientActionState } from "../(actions)/createIngredientAction"
+import VideoEditorSheet from "./create-recipe-form/VideoEditorSheet"
 
 declare global {
   interface Window {
@@ -36,81 +52,29 @@ interface CreateRecipeFormProps {
     prevState: CreateIngredientActionState,
     formData: FormData
   ) => Promise<CreateIngredientActionState>
+  canCreateIngredients: boolean
   ingredients: IngredientListItem[]
   ingredientsError: string | null
 }
 
-type BuilderInstruction = {
-  id: number
-  step: number
-  short_desc: string
-  long_desc: string
-  heat: string | null
-  time_minutes: number | null
-  step_instructions: Array<{
-    ingredientId: number
-    quantity: number | null
-    unit: string | null
-  }>
-}
-
-function normalizeCategory(category: string | null | undefined): string {
-  const c = typeof category === "string" ? category.trim() : ""
-  return c ? c : "Other"
-}
-
-function toYoutubeEmbedUrl(url: string): string | null {
-  try {
-    const parsed = new URL(url)
-
-    const buildEmbed = (id: string) => {
-      const params = new URLSearchParams({
-        rel: "0",
-        modestbranding: "1",
-        enablejsapi: "1"
-      })
-
-      if (typeof window !== "undefined" && window.location?.origin) {
-        params.set("origin", window.location.origin)
-      }
-
-      return `https://www.youtube.com/embed/${id}?${params.toString()}`
-    }
-
-    if (parsed.hostname === "youtu.be") {
-      const id = parsed.pathname.replace("/", "").trim()
-      return id ? buildEmbed(id) : null
-    }
-
-    if (
-      parsed.hostname === "www.youtube.com" ||
-      parsed.hostname === "youtube.com" ||
-      parsed.hostname === "m.youtube.com"
-    ) {
-      const pathParts = parsed.pathname.split("/").filter(Boolean)
-      if (pathParts[0] === "embed" && pathParts[1]) {
-        return buildEmbed(pathParts[1])
-      }
-      const id = parsed.searchParams.get("v")
-      return id ? buildEmbed(id) : null
-    }
-
-    return null
-  } catch {
-    return null
-  }
-}
+const LOCAL_STORAGE_KEY = "jd-recipes-create-recipe-form-v1"
 
 export default function CreateRecipeForm({
   createRecipeAction,
   createIngredientAction,
+  canCreateIngredients,
   ingredients,
   ingredientsError
 }: CreateRecipeFormProps) {
+  const formRef = useRef<HTMLFormElement | null>(null)
   const router = useRouter()
   const lastAutoDescriptionVideoUrlRef = useRef<string | null>(null)
 
   const youtubeIframeRef = useRef<HTMLIFrameElement | null>(null)
+  const ingredientPickerInputRef = useRef<HTMLInputElement | null>(null)
+  const instructionShortInputRef = useRef<HTMLInputElement | null>(null)
+  const videoDraftInputRef = useRef<HTMLInputElement | null>(null)
+  const createIngredientNameInputRef = useRef<HTMLInputElement | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const youtubePlayerRef = useRef<any>(null)
   const youtubeLastKnownStateRef = useRef<number | null>(null)
@@ -134,11 +98,48 @@ export default function CreateRecipeForm({
   const [description, setDescription] = useState<string>("")
   const [videoUrl, setVideoUrl] = useState<string>("")
   const [activeTab, setActiveTab] = useState<TabKey>("instructions")
-
   const [instructions, setInstructions] = useState<BuilderInstruction[]>([])
   const [builderIngredients, setBuilderIngredients] = useState<
-    DisplayIngredient[]
+    BuilderIngredient[]
   >([])
+
+  // Restore from localStorage on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      const raw = window.localStorage.getItem(LOCAL_STORAGE_KEY)
+      if (!raw) return
+      const data = JSON.parse(raw)
+      if (typeof data !== "object" || !data) return
+      if (typeof data.name === "string") setName(data.name)
+      if (typeof data.description === "string") setDescription(data.description)
+      if (typeof data.videoUrl === "string") setVideoUrl(data.videoUrl)
+      if (typeof data.activeTab === "string") setActiveTab(data.activeTab)
+      if (Array.isArray(data.instructions)) {
+        const restoredInstructions = data.instructions as BuilderInstruction[]
+        setInstructions(renumberInstructions(restoredInstructions))
+        setNextInstructionId(getNextInstructionId(restoredInstructions))
+      }
+      if (Array.isArray(data.builderIngredients))
+        setBuilderIngredients(data.builderIngredients)
+    } catch {}
+  }, [])
+
+  // Save to localStorage on change
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const data = {
+      name,
+      description,
+      videoUrl,
+      activeTab,
+      instructions,
+      builderIngredients
+    }
+    try {
+      window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data))
+    } catch {}
+  }, [name, description, videoUrl, activeTab, instructions, builderIngredients])
 
   const [nextInstructionId, setNextInstructionId] = useState<number>(1)
 
@@ -183,10 +184,17 @@ export default function CreateRecipeForm({
   const [newIngredientUnit, setNewIngredientUnit] = useState<string>("")
   const [isCategorySuggestionsOpen, setIsCategorySuggestionsOpen] =
     useState<boolean>(false)
+  const [highlightedCategoryOption, setHighlightedCategoryOption] = useState<
+    string | null
+  >(null)
 
   const [ingredientPickerQuery, setIngredientPickerQuery] = useState<string>("")
   const [isIngredientPickerOpen, setIsIngredientPickerOpen] =
     useState<boolean>(false)
+  const [highlightedIngredientId, setHighlightedIngredientId] = useState<
+    number | null
+  >(null)
+  const [showConfirmReset, setShowConfirmReset] = useState<boolean>(false)
 
   const ingredientById = useMemo(() => {
     const byId = new Map<number, IngredientListItem>()
@@ -224,6 +232,29 @@ export default function CreateRecipeForm({
     return categoryOptions.filter((c) => c.toLowerCase().includes(q))
   }, [categoryOptions, newIngredientCategory])
 
+  useEffect(() => {
+    if (!isCategorySuggestionsOpen) {
+      setHighlightedCategoryOption(null)
+      return
+    }
+
+    if (!filteredCategoryOptions.length) {
+      setHighlightedCategoryOption(null)
+      return
+    }
+
+    const hasHighlighted = filteredCategoryOptions.includes(
+      highlightedCategoryOption ?? ""
+    )
+    if (!hasHighlighted) {
+      setHighlightedCategoryOption(filteredCategoryOptions[0] ?? null)
+    }
+  }, [
+    filteredCategoryOptions,
+    highlightedCategoryOption,
+    isCategorySuggestionsOpen
+  ])
+
   const groupedIngredientMatches = useMemo(() => {
     const q = ingredientPickerQuery.trim().toLowerCase()
     const matches = q
@@ -253,6 +284,29 @@ export default function CreateRecipeForm({
     })
   }, [availableIngredients, ingredientPickerQuery])
 
+  const flatIngredientMatches = useMemo(() => {
+    return groupedIngredientMatches.flatMap((group) => group.items)
+  }, [groupedIngredientMatches])
+
+  useEffect(() => {
+    if (!isIngredientPickerOpen) {
+      setHighlightedIngredientId(null)
+      return
+    }
+
+    if (!flatIngredientMatches.length) {
+      setHighlightedIngredientId(null)
+      return
+    }
+
+    const hasHighlighted = flatIngredientMatches.some(
+      (ingredient) => ingredient.id === highlightedIngredientId
+    )
+    if (!hasHighlighted) {
+      setHighlightedIngredientId(flatIngredientMatches[0]?.id ?? null)
+    }
+  }, [flatIngredientMatches, highlightedIngredientId, isIngredientPickerOpen])
+
   useEffect(() => {
     setAvailableIngredients(ingredients)
   }, [ingredients])
@@ -264,6 +318,7 @@ export default function CreateRecipeForm({
 
   const previewInstructions = useMemo(() => {
     return instructions.map((x) => ({
+      id: x.id,
       step: x.step,
       short_desc: x.short_desc,
       long_desc: x.long_desc,
@@ -282,6 +337,7 @@ export default function CreateRecipeForm({
       builderIngredients.map((x) => ({
         ingredientId: x.ingredientId,
         quantity: x.quantity,
+        quantity_display: x.quantityDisplay ?? null,
         unit: x.unit
       }))
     )
@@ -295,13 +351,15 @@ export default function CreateRecipeForm({
         long_desc: x.long_desc,
         heat: x.heat,
         time_minutes: x.time_minutes,
-        step_instructions: x.step_instructions
+        step_instructions: x.step_instructions.map((si) => ({
+          ingredientId: si.ingredientId,
+          quantity: si.quantity,
+          quantity_display: si.quantity_display ?? null,
+          unit: si.unit
+        }))
       }))
     )
   }, [instructions])
-
-  const addButtonLabel =
-    activeTab === "ingredients" ? "Add ingredient" : "Add instruction"
 
   function tryGetRecipeId(recipe: unknown): number | null {
     if (!recipe || typeof recipe !== "object") return null
@@ -313,6 +371,12 @@ export default function CreateRecipeForm({
 
   useEffect(() => {
     if (actionState.status !== "success") return
+    // Clear localStorage on success
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.removeItem(LOCAL_STORAGE_KEY)
+      } catch {}
+    }
     const recipeId = tryGetRecipeId(actionState.recipe)
     if (!recipeId) return
     router.push(`/recipe/${recipeId}`)
@@ -407,22 +471,80 @@ export default function CreateRecipeForm({
     requestAnimationFrame(() => resumeYouTubeIfWePaused())
   }
 
-  function openAddPanelForActiveTab() {
+  useEffect(() => {
+    if (!isAddIngredientOpen) return
+
+    const rafId = requestAnimationFrame(() => {
+      ingredientPickerInputRef.current?.focus()
+    })
+
+    return () => cancelAnimationFrame(rafId)
+  }, [isAddIngredientOpen])
+
+  useEffect(() => {
+    if (!isAddInstructionOpen) return
+
+    const rafId = requestAnimationFrame(() => {
+      instructionShortInputRef.current?.focus()
+    })
+
+    return () => cancelAnimationFrame(rafId)
+  }, [isAddInstructionOpen])
+
+  useEffect(() => {
+    if (!isVideoEditorOpen) return
+
+    const rafId = requestAnimationFrame(() => {
+      videoDraftInputRef.current?.focus()
+    })
+
+    return () => cancelAnimationFrame(rafId)
+  }, [isVideoEditorOpen])
+
+  useEffect(() => {
+    if (!isCreateIngredientOpen) return
+
+    const rafId = requestAnimationFrame(() => {
+      createIngredientNameInputRef.current?.focus()
+    })
+
+    return () => cancelAnimationFrame(rafId)
+  }, [isCreateIngredientOpen])
+
+  function openAddIngredientPanel() {
     pauseYouTubeIfPlaying()
+    setActiveTab("ingredients")
+    setEditingIngredientId(null)
+    setIngredientDraftSourceId("")
+    setIngredientDraftName("")
+    setIngredientPickerQuery("")
+    setIsIngredientPickerOpen(false)
+    setHighlightedIngredientId(null)
+    setIngredientDraftError("")
+    setIngredientDraftQuantity("")
+    setIngredientDraftUnit("")
+    setIsAddIngredientOpen(true)
+  }
+
+  function openAddInstructionPanel() {
+    pauseYouTubeIfPlaying()
+    setActiveTab("instructions")
+    setEditingInstructionIdx(null)
+    setInstructionDraftShort("")
+    setInstructionDraftLong("")
+    setInstructionDraftHeat("")
+    setInstructionDraftTimeMinutes("")
+    setInstructionDraftIngredientIdToAdd("")
+    setInstructionDraftStepIngredients([])
+    setIsAddInstructionOpen(true)
+  }
+
+  function openAddPanelForActiveTab() {
     if (activeTab === "ingredients") {
-      setEditingIngredientId(null)
-      setIngredientDraftSourceId("")
-      setIngredientDraftName("")
-      setIngredientPickerQuery("")
-      setIsIngredientPickerOpen(false)
-      setIngredientDraftError("")
-      setIngredientDraftQuantity("")
-      setIngredientDraftUnit("")
-      setIsAddIngredientOpen(true)
+      openAddIngredientPanel()
       return
     }
-    setEditingInstructionIdx(null)
-    setIsAddInstructionOpen(true)
+    openAddInstructionPanel()
   }
 
   function openEditIngredient(ingredientId: number) {
@@ -439,9 +561,11 @@ export default function CreateRecipeForm({
     setIsIngredientPickerOpen(false)
     setIngredientDraftError("")
     setIngredientDraftQuantity(
-      existing.quantity !== null && existing.quantity !== undefined
-        ? String(existing.quantity)
-        : ""
+      existing.quantityDisplay
+        ? String(existing.quantityDisplay)
+        : existing.quantity !== null && existing.quantity !== undefined
+          ? String(existing.quantity)
+          : ""
     )
     setIngredientDraftUnit(existing.unit ? String(existing.unit) : "")
     setIsAddIngredientOpen(true)
@@ -465,8 +589,9 @@ export default function CreateRecipeForm({
     setInstructionDraftStepIngredients(
       (existing.step_instructions ?? []).map((si) => ({
         ingredientId: si.ingredientId,
-        quantity:
-          si.quantity !== null && si.quantity !== undefined
+        quantity: si.quantity_display
+          ? String(si.quantity_display)
+          : si.quantity !== null && si.quantity !== undefined
             ? String(si.quantity)
             : "",
         unit: si.unit ? String(si.unit) : ""
@@ -603,7 +728,7 @@ export default function CreateRecipeForm({
 
         if (!title && !author) return
 
-        const nextDescription = `Learned from YouTube recipe ${title || "this video"} from channel ${author || "the creator"}.`
+        const nextDescription = `Learned from YouTube recipe '${title || "this video"}' from channel '${author || "the creator"}'.`
 
         setDescription((prev) => {
           if (prev.trim()) return prev
@@ -637,15 +762,14 @@ export default function CreateRecipeForm({
 
     const step_instructions = instructionDraftStepIngredients
       .map((si) => {
-        const quantityRaw = si.quantity.trim()
-        const quantityParsed = quantityRaw ? Number(quantityRaw) : NaN
-        const quantity = Number.isFinite(quantityParsed) ? quantityParsed : null
+        const parsedQuantity = parseQuantityInput(si.quantity)
         const unitRaw = si.unit.trim()
         const unit = unitRaw ? unitRaw : null
 
         return {
           ingredientId: si.ingredientId,
-          quantity,
+          quantity: parsedQuantity.quantity,
+          quantity_display: parsedQuantity.quantityDisplay,
           unit
         }
       })
@@ -722,7 +846,17 @@ export default function CreateRecipeForm({
 
     setInstructionDraftStepIngredients((prev) => {
       if (prev.some((x) => x.ingredientId === parsed)) return prev
-      return [...prev, { ingredientId: parsed, quantity: "", unit: "" }]
+      // Find the ingredient's default unit from builderIngredients
+      const baseIngredient = builderIngredients.find(
+        (x) => x.ingredientId === parsed
+      )
+      const defaultUnit = baseIngredient?.unit
+        ? String(baseIngredient.unit)
+        : ""
+      return [
+        ...prev,
+        { ingredientId: parsed, quantity: "", unit: defaultUnit }
+      ]
     })
   }
 
@@ -748,25 +882,15 @@ export default function CreateRecipeForm({
 
     const unitTrimmed = ingredientDraftUnit.trim()
     const quantityTrimmed = ingredientDraftQuantity.trim()
-
-    const quantity = quantityTrimmed ? Number(quantityTrimmed) : NaN
-    const normalizedQuantity = Number.isFinite(quantity) ? quantity : null
+    const parsedQuantity = parseQuantityInput(quantityTrimmed)
+    const normalizedQuantity = parsedQuantity.quantity
 
     const bySelectedId = (() => {
       const parsed = Number.parseInt(ingredientDraftSourceId, 10)
       return Number.isInteger(parsed) ? ingredientById.get(parsed) : null
     })()
 
-    const byName = (() => {
-      const n = ingredientDraftName.trim().toLowerCase()
-      if (!n) return null
-      return (
-        availableIngredients.find((x) => x.name.trim().toLowerCase() === n) ??
-        null
-      )
-    })()
-
-    const source = bySelectedId ?? byName
+    const source = bySelectedId
     if (!source) return
 
     if (editingIngredientId !== null) {
@@ -792,6 +916,7 @@ export default function CreateRecipeForm({
             name: source.name,
             category: source.category ?? null,
             quantity: normalizedQuantity,
+            quantityDisplay: parsedQuantity.quantityDisplay,
             unit: unitTrimmed || source.unit || null
           }
         })
@@ -823,6 +948,7 @@ export default function CreateRecipeForm({
           name: source.name,
           category: source.category ?? null,
           quantity: normalizedQuantity,
+          quantityDisplay: parsedQuantity.quantityDisplay,
           unit: unitTrimmed || source.unit || null
         }
       ]
@@ -841,34 +967,142 @@ export default function CreateRecipeForm({
     if (!ing) return
     setIngredientDraftName(ing.name)
     setIngredientPickerQuery(ing.name)
+    setHighlightedIngredientId(ing.id)
     if (ing.unit) setIngredientDraftUnit(String(ing.unit))
   }
 
-  function onChangeIngredientDraftName(nextName: string) {
+  function onChangeIngredientPickerQuery(nextQuery: string) {
     setIngredientDraftError("")
-    setIngredientDraftName(nextName)
+    setIngredientPickerQuery(nextQuery)
+    setIngredientDraftName(nextQuery)
+    setIngredientDraftSourceId("")
+    setIsIngredientPickerOpen(true)
+  }
 
-    const normalized = nextName.trim().toLowerCase()
-    if (!normalized) {
-      setIngredientDraftSourceId("")
+  function onChangeCategoryQuery(nextQuery: string) {
+    setNewIngredientCategory(nextQuery)
+    setIsCategorySuggestionsOpen(true)
+  }
+
+  function onCategorySuggestionsKeyDown(
+    event: React.KeyboardEvent<HTMLInputElement>
+  ) {
+    if (!isCategorySuggestionsOpen && event.key === "ArrowDown") {
+      event.preventDefault()
+      setIsCategorySuggestionsOpen(true)
+      setHighlightedCategoryOption(filteredCategoryOptions[0] ?? null)
       return
     }
 
-    const match =
-      availableIngredients.find(
-        (x) => x.name.trim().toLowerCase() === normalized
-      ) ?? null
-
-    if (!match) {
-      setIngredientDraftSourceId("")
+    if (!filteredCategoryOptions.length) {
+      if (event.key === "Escape") setIsCategorySuggestionsOpen(false)
       return
     }
 
-    setIngredientDraftSourceId(String(match.id))
-    if (match.unit) setIngredientDraftUnit(String(match.unit))
+    const currentIndex = filteredCategoryOptions.findIndex(
+      (option) => option === highlightedCategoryOption
+    )
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault()
+      setIsCategorySuggestionsOpen(true)
+      const nextIndex =
+        currentIndex >= 0
+          ? (currentIndex + 1) % filteredCategoryOptions.length
+          : 0
+      setHighlightedCategoryOption(filteredCategoryOptions[nextIndex] ?? null)
+      return
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault()
+      setIsCategorySuggestionsOpen(true)
+      const nextIndex =
+        currentIndex >= 0
+          ? (currentIndex - 1 + filteredCategoryOptions.length) %
+            filteredCategoryOptions.length
+          : filteredCategoryOptions.length - 1
+      setHighlightedCategoryOption(filteredCategoryOptions[nextIndex] ?? null)
+      return
+    }
+
+    if (event.key === "Enter") {
+      if (!isCategorySuggestionsOpen) return
+      event.preventDefault()
+      if (!highlightedCategoryOption) return
+      setNewIngredientCategory(highlightedCategoryOption)
+      setIsCategorySuggestionsOpen(false)
+      return
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault()
+      setIsCategorySuggestionsOpen(false)
+    }
+  }
+
+  function onIngredientPickerKeyDown(
+    event: React.KeyboardEvent<HTMLInputElement>
+  ) {
+    if (!isIngredientPickerOpen && event.key === "ArrowDown") {
+      event.preventDefault()
+      setIsIngredientPickerOpen(true)
+      setHighlightedIngredientId(flatIngredientMatches[0]?.id ?? null)
+      return
+    }
+
+    if (!flatIngredientMatches.length) {
+      if (event.key === "Escape") setIsIngredientPickerOpen(false)
+      return
+    }
+
+    const currentIndex = flatIngredientMatches.findIndex(
+      (ingredient) => ingredient.id === highlightedIngredientId
+    )
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault()
+      setIsIngredientPickerOpen(true)
+      const nextIndex =
+        currentIndex >= 0
+          ? (currentIndex + 1) % flatIngredientMatches.length
+          : 0
+      setHighlightedIngredientId(flatIngredientMatches[nextIndex]?.id ?? null)
+      return
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault()
+      setIsIngredientPickerOpen(true)
+      const nextIndex =
+        currentIndex >= 0
+          ? (currentIndex - 1 + flatIngredientMatches.length) %
+            flatIngredientMatches.length
+          : flatIngredientMatches.length - 1
+      setHighlightedIngredientId(flatIngredientMatches[nextIndex]?.id ?? null)
+      return
+    }
+
+    if (event.key === "Enter") {
+      if (!isIngredientPickerOpen) return
+      event.preventDefault()
+      const selectedIngredient = flatIngredientMatches.find(
+        (ingredient) => ingredient.id === highlightedIngredientId
+      )
+      if (!selectedIngredient) return
+      onSelectDraftIngredientSource(String(selectedIngredient.id))
+      setIsIngredientPickerOpen(false)
+      return
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault()
+      setIsIngredientPickerOpen(false)
+    }
   }
 
   function submitCreateIngredientDraft() {
+    if (!newIngredientName.trim()) return
     const fd = new FormData()
     fd.set("name", newIngredientName)
     fd.set("category", newIngredientCategory)
@@ -878,8 +1112,229 @@ export default function CreateRecipeForm({
     })
   }
 
+  function trySubmitIngredientDraft() {
+    const hasMatch = Boolean(ingredientDraftSourceId)
+    if (!hasMatch) {
+      setIngredientDraftError(
+        "Pick an ingredient that already exists (use the suggestions/list)."
+      )
+      return
+    }
+
+    submitIngredientDraft()
+  }
+
+  function closeCurrentPanel() {
+    if (showConfirmReset) {
+      setShowConfirmReset(false)
+      return
+    }
+    if (isCreateIngredientOpen) {
+      setIsCreateIngredientOpen(false)
+      return
+    }
+    if (isAddIngredientOpen) {
+      if (isIngredientPickerOpen) {
+        setIsIngredientPickerOpen(false)
+        return
+      }
+      closeAddIngredientPanel()
+      return
+    }
+    if (isAddInstructionOpen) {
+      closeAddInstructionPanel()
+      return
+    }
+    if (isVideoEditorOpen) {
+      setIsVideoEditorOpen(false)
+      return
+    }
+  }
+
+  useEffect(() => {
+    const onWindowKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return
+
+      if (event.key === "Escape") {
+        const hasOpenPanel =
+          showConfirmReset ||
+          isCreateIngredientOpen ||
+          isAddIngredientOpen ||
+          isAddInstructionOpen ||
+          isVideoEditorOpen
+        if (!hasOpenPanel) return
+        event.preventDefault()
+        closeCurrentPanel()
+        return
+      }
+
+      if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+        const key = event.key.toLowerCase()
+        const hasOpenPanel =
+          showConfirmReset ||
+          isCreateIngredientOpen ||
+          isAddIngredientOpen ||
+          isAddInstructionOpen ||
+          isVideoEditorOpen
+
+        if (key === "1") {
+          if (!hasOpenPanel) {
+            event.preventDefault()
+            setActiveTab("instructions")
+          }
+          return
+        }
+
+        if (key === "2") {
+          if (!hasOpenPanel) {
+            event.preventDefault()
+            setActiveTab("ingredients")
+          }
+          return
+        }
+
+        if (key === "i") {
+          if (!hasOpenPanel) {
+            event.preventDefault()
+            openAddPanelForActiveTab()
+          }
+          return
+        }
+        return
+      }
+
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+        event.preventDefault()
+
+        if (showConfirmReset) {
+          resetForm()
+          return
+        }
+        if (isCreateIngredientOpen) {
+          submitCreateIngredientDraft()
+          return
+        }
+        if (isAddIngredientOpen) {
+          trySubmitIngredientDraft()
+          return
+        }
+        if (isAddInstructionOpen) {
+          submitInstructionDraft()
+          return
+        }
+        if (isVideoEditorOpen) {
+          submitVideoDraft()
+          return
+        }
+        if (!isPending) {
+          formRef.current?.requestSubmit()
+        }
+      }
+    }
+
+    window.addEventListener("keydown", onWindowKeyDown)
+    return () => window.removeEventListener("keydown", onWindowKeyDown)
+  }, [
+    isAddIngredientOpen,
+    isAddInstructionOpen,
+    isCreateIngredientOpen,
+    isIngredientPickerOpen,
+    isPending,
+    isVideoEditorOpen,
+    newIngredientName,
+    showConfirmReset,
+    ingredientDraftSourceId,
+    activeTab,
+    submitInstructionDraft,
+    submitVideoDraft
+  ])
+
+  function deleteInstruction(instructionIdx: number) {
+    setInstructions((prev) =>
+      renumberInstructions(prev.filter((_, idx) => idx !== instructionIdx))
+    )
+  }
+
+  function reorderInstruction(fromIndex: number, toIndex: number) {
+    setInstructions((prev) => {
+      if (
+        fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex >= prev.length ||
+        toIndex >= prev.length ||
+        fromIndex === toIndex
+      ) {
+        return prev
+      }
+
+      const next = [...prev]
+      const [movedInstruction] = next.splice(fromIndex, 1)
+      if (!movedInstruction) return prev
+      next.splice(toIndex, 0, movedInstruction)
+      return renumberInstructions(next)
+    })
+  }
+
+  function deleteIngredient(ingredientId: number) {
+    setBuilderIngredients((prev) =>
+      prev.filter((ingredient) => ingredient.ingredientId !== ingredientId)
+    )
+    setInstructions((prev) =>
+      prev.map((step) => ({
+        ...step,
+        step_instructions: step.step_instructions.filter(
+          (stepIngredient) => stepIngredient.ingredientId !== ingredientId
+        )
+      }))
+    )
+  }
+
+  function resetForm() {
+    setName("")
+    setDescription("")
+    setVideoUrl("")
+    setActiveTab("instructions")
+    setInstructions([])
+    setBuilderIngredients([])
+    setNextInstructionId(1)
+    setVideoDraftUrl("")
+    setIsVideoEditorOpen(false)
+    setIsAddInstructionOpen(false)
+    setEditingInstructionIdx(null)
+    setInstructionDraftShort("")
+    setInstructionDraftLong("")
+    setInstructionDraftHeat("")
+    setInstructionDraftTimeMinutes("")
+    setInstructionDraftIngredientIdToAdd("")
+    setInstructionDraftStepIngredients([])
+    setIsAddIngredientOpen(false)
+    setEditingIngredientId(null)
+    setIngredientDraftSourceId("")
+    setIngredientDraftName("")
+    setIngredientDraftError("")
+    setIngredientDraftQuantity("")
+    setIngredientDraftUnit("")
+    setIsCreateIngredientOpen(false)
+    setNewIngredientName("")
+    setNewIngredientCategory("")
+    setNewIngredientUnit("")
+    setIsCategorySuggestionsOpen(false)
+    setIngredientPickerQuery("")
+    setIsIngredientPickerOpen(false)
+    setShowConfirmReset(false)
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.removeItem(LOCAL_STORAGE_KEY)
+      } catch {}
+    }
+  }
+
   return (
-    <form action={formAction} className="flex flex-col gap-6 pb-24">
+    <form
+      ref={formRef}
+      action={formAction}
+      className="flex flex-col gap-6 pb-24"
+    >
       <input type="hidden" name="videoUrl" value={videoUrl} />
       <input type="hidden" name="ingredientsJson" value={ingredientsJson} />
       <input type="hidden" name="instructionsJson" value={instructionsJson} />
@@ -965,560 +1420,163 @@ export default function CreateRecipeForm({
         </div>
       ) : null}
 
-      <RecipeSectionsToggle
-        ingredients={previewIngredients}
-        instructions={previewInstructions}
-        onTabChange={setActiveTab}
-        onEditIngredient={openEditIngredient}
-        onEditInstruction={openEditInstruction}
-        footerExtra={
-          <Button type="submit" variant="success" disabled={isPending}>
-            {isPending ? "Creating…" : "Create recipe"}
-          </Button>
-        }
-      />
-
       {actionState.status === "error" ? (
         <p className="text-sm text-red-600">{actionState.message}</p>
       ) : null}
 
-      <div className="flex items-center gap-3">
-        <Button type="button" onClick={openAddPanelForActiveTab}>
-          {addButtonLabel}
-        </Button>
-      </div>
-
-      {isVideoEditorOpen ? (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-background/80"
-            onClick={() => setIsVideoEditorOpen(false)}
-          />
-          <div className="fixed inset-x-0 bottom-24 z-50">
-            <div className="mx-auto w-full max-w-3xl px-4">
-              <div className="rounded-lg border border-border bg-background p-4">
-                <div className="flex flex-col gap-3">
-                  <p className="text-sm font-medium">Video URL</p>
-                  <input
-                    value={videoDraftUrl}
-                    onChange={(e) => setVideoDraftUrl(e.target.value)}
-                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground"
-                    placeholder="https://www.youtube.com/watch?v=…"
-                    autoComplete="off"
-                  />
-                  <div className="flex items-center gap-3">
-                    <Button type="button" onClick={submitVideoDraft}>
-                      Save
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => setIsVideoEditorOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
+      <RecipeSectionsToggle
+        ingredients={previewIngredients}
+        instructions={previewInstructions}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        instructionsTabLabel="Instructions (Alt+1)"
+        ingredientsTabLabel="Ingredients (Alt+2)"
+        onEditIngredient={openEditIngredient}
+        onEditInstruction={openEditInstruction}
+        onDeleteIngredient={deleteIngredient}
+        onDeleteInstruction={deleteInstruction}
+        onReorderInstruction={reorderInstruction}
+        ingredientsHeaderExtra={
+          <>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                setActiveTab("ingredients")
+                openAddPanelForActiveTab()
+              }}
+            >
+              Add ingredient (Alt+I)
+            </Button>
+          </>
+        }
+        instructionsHeaderExtra={
+          <>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                setActiveTab("instructions")
+                openAddPanelForActiveTab()
+              }}
+            >
+              Add instruction (Alt+I)
+            </Button>
+          </>
+        }
+        footerExtra={
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="destructive"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/85"
+              onClick={() => setShowConfirmReset(true)}
+            >
+              Start over
+            </Button>
+            <Button type="submit" variant="success" disabled={isPending}>
+              {isPending ? "Creating…" : "Create recipe (Ctrl+Enter)"}
+            </Button>
           </div>
-        </>
-      ) : null}
+        }
+      />
 
-      {isAddInstructionOpen ? (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-background/80"
-            onClick={closeAddInstructionPanel}
-          />
-          <div className="fixed inset-x-0 bottom-24 z-50">
-            <div className="mx-auto w-full max-w-3xl px-4">
-              <div className="rounded-lg border border-border bg-background p-4">
-                <div className="flex flex-col gap-3">
-                  <p className="text-sm font-medium">
-                    {editingInstructionIdx !== null
-                      ? "Edit instruction"
-                      : "New instruction"}
-                  </p>
-                  <input
-                    value={instructionDraftShort}
-                    onChange={(e) => setInstructionDraftShort(e.target.value)}
-                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground"
-                    placeholder="Short step (e.g. Cook salmon)"
-                    autoComplete="off"
-                  />
-                  <textarea
-                    value={instructionDraftLong}
-                    onChange={(e) => setInstructionDraftLong(e.target.value)}
-                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground"
-                    placeholder="Details (optional)"
-                    rows={4}
-                  />
+      <ConfirmResetDialog
+        open={showConfirmReset}
+        onCancel={() => setShowConfirmReset(false)}
+        onConfirm={resetForm}
+      />
 
-                  <div className="flex items-center gap-2">
-                    <input
-                      value={instructionDraftHeat}
-                      onChange={(e) => setInstructionDraftHeat(e.target.value)}
-                      className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-foreground"
-                      placeholder="Heat (optional) e.g. medium"
-                      autoComplete="off"
-                    />
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min={0}
-                      value={instructionDraftTimeMinutes}
-                      onChange={(e) =>
-                        setInstructionDraftTimeMinutes(e.target.value)
-                      }
-                      className="w-28 rounded-md border border-border bg-background px-3 py-2 text-foreground"
-                      placeholder="Min"
-                    />
-                  </div>
+      <VideoEditorSheet
+        open={isVideoEditorOpen}
+        videoDraftUrl={videoDraftUrl}
+        inputRef={videoDraftInputRef}
+        onChange={setVideoDraftUrl}
+        onSave={submitVideoDraft}
+        onCancel={() => setIsVideoEditorOpen(false)}
+      />
 
-                  <div className="flex flex-col gap-2">
-                    <p className="text-xs font-medium text-muted-foreground">
-                      Step ingredients
-                    </p>
+      <InstructionEditorSheet
+        open={isAddInstructionOpen}
+        editingInstructionIdx={editingInstructionIdx}
+        instructionShortInputRef={instructionShortInputRef}
+        instructionDraftShort={instructionDraftShort}
+        instructionDraftLong={instructionDraftLong}
+        instructionDraftHeat={instructionDraftHeat}
+        instructionDraftTimeMinutes={instructionDraftTimeMinutes}
+        instructionDraftIngredientIdToAdd={instructionDraftIngredientIdToAdd}
+        instructionDraftStepIngredients={instructionDraftStepIngredients}
+        builderIngredients={builderIngredients}
+        onShortChange={setInstructionDraftShort}
+        onLongChange={setInstructionDraftLong}
+        onHeatChange={setInstructionDraftHeat}
+        onTimeMinutesChange={setInstructionDraftTimeMinutes}
+        onIngredientToAddChange={setInstructionDraftIngredientIdToAdd}
+        onAddStepIngredient={addInstructionDraftStepIngredient}
+        onRemoveStepIngredient={removeInstructionDraftStepIngredient}
+        onUpdateStepIngredient={updateInstructionDraftStepIngredient}
+        onSubmit={submitInstructionDraft}
+        onClose={closeAddInstructionPanel}
+      />
 
-                    {builderIngredients.length ? (
-                      <div className="flex items-center gap-2">
-                        <select
-                          className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-foreground"
-                          value={instructionDraftIngredientIdToAdd}
-                          onChange={(e) =>
-                            setInstructionDraftIngredientIdToAdd(e.target.value)
-                          }
-                        >
-                          <option value="">Select ingredient…</option>
-                          {builderIngredients.map((ing) => (
-                            <option
-                              key={ing.ingredientId}
-                              value={String(ing.ingredientId)}
-                            >
-                              {ing.name}
-                              {ing.quantity !== null &&
-                              ing.quantity !== undefined
-                                ? ing.unit
-                                  ? ` — ${ing.quantity} ${ing.unit} available`
-                                  : ` — ${ing.quantity} available`
-                                : ing.unit
-                                  ? ` — ${ing.unit} available`
-                                  : ""}
-                            </option>
-                          ))}
-                        </select>
+      <IngredientEditorSheet
+        open={isAddIngredientOpen}
+        canCreateIngredients={canCreateIngredients}
+        editingIngredientId={editingIngredientId}
+        ingredientsError={ingredientsError}
+        availableIngredients={availableIngredients}
+        groupedIngredientMatches={groupedIngredientMatches}
+        ingredientPickerInputRef={ingredientPickerInputRef}
+        ingredientPickerQuery={ingredientPickerQuery}
+        ingredientDraftSourceId={ingredientDraftSourceId}
+        ingredientDraftError={ingredientDraftError}
+        ingredientDraftQuantity={ingredientDraftQuantity}
+        ingredientDraftUnit={ingredientDraftUnit}
+        highlightedIngredientId={highlightedIngredientId}
+        isIngredientPickerOpen={isIngredientPickerOpen}
+        onIngredientQueryChange={onChangeIngredientPickerQuery}
+        onIngredientPickerKeyDown={onIngredientPickerKeyDown}
+        onIngredientPickerFocus={() => setIsIngredientPickerOpen(true)}
+        onIngredientPickerBlur={() => setIsIngredientPickerOpen(false)}
+        onSelectDraftIngredientSource={onSelectDraftIngredientSource}
+        onHighlightIngredient={setHighlightedIngredientId}
+        onSetIngredientPickerOpen={setIsIngredientPickerOpen}
+        onQuantityChange={setIngredientDraftQuantity}
+        onUnitChange={setIngredientDraftUnit}
+        onSubmit={trySubmitIngredientDraft}
+        onOpenCreateIngredient={() => {
+          if (!canCreateIngredients) return
+          setNewIngredientName(ingredientPickerQuery.trim())
+          setNewIngredientCategory("")
+          setNewIngredientUnit(ingredientDraftUnit.trim())
+          setIsCreateIngredientOpen(true)
+        }}
+        onClose={closeAddIngredientPanel}
+      />
 
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          onClick={addInstructionDraftStepIngredient}
-                          disabled={!instructionDraftIngredientIdToAdd}
-                        >
-                          Add
-                        </Button>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">
-                        Add ingredients to the recipe first to attach them to a
-                        step.
-                      </p>
-                    )}
-
-                    {instructionDraftStepIngredients.length ? (
-                      <div className="flex flex-col gap-2">
-                        {instructionDraftStepIngredients.map((si) => {
-                          const baseIngredient = builderIngredients.find(
-                            (x) => x.ingredientId === si.ingredientId
-                          )
-                          const ingName =
-                            baseIngredient?.name ??
-                            `Ingredient ${si.ingredientId}`
-
-                          const availableText =
-                            baseIngredient &&
-                            (baseIngredient.quantity !== null &&
-                            baseIngredient.quantity !== undefined
-                              ? baseIngredient.unit
-                                ? `${baseIngredient.quantity} ${baseIngredient.unit}`
-                                : String(baseIngredient.quantity)
-                              : baseIngredient.unit
-                                ? String(baseIngredient.unit)
-                                : "")
-
-                          return (
-                            <div
-                              key={si.ingredientId}
-                              className="flex flex-col gap-2 rounded-md border border-border bg-background/50 px-3 py-2"
-                            >
-                              <div className="flex items-center justify-between gap-3">
-                                <div className="flex flex-col">
-                                  <p className="text-sm font-medium leading-tight">
-                                    {ingName}
-                                  </p>
-                                  {availableText ? (
-                                    <p className="text-xs text-muted-foreground">
-                                      Available: {availableText}
-                                    </p>
-                                  ) : null}
-                                </div>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="secondary"
-                                  onClick={() =>
-                                    removeInstructionDraftStepIngredient(
-                                      si.ingredientId
-                                    )
-                                  }
-                                >
-                                  Remove
-                                </Button>
-                              </div>
-
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="number"
-                                  inputMode="decimal"
-                                  step="any"
-                                  value={si.quantity}
-                                  onChange={(e) =>
-                                    updateInstructionDraftStepIngredient(
-                                      si.ingredientId,
-                                      {
-                                        quantity: e.target.value
-                                      }
-                                    )
-                                  }
-                                  className="w-28 rounded-md border border-border bg-background px-3 py-2 text-foreground"
-                                  placeholder="Qty"
-                                />
-                                <input
-                                  value={si.unit}
-                                  onChange={(e) =>
-                                    updateInstructionDraftStepIngredient(
-                                      si.ingredientId,
-                                      {
-                                        unit: e.target.value
-                                      }
-                                    )
-                                  }
-                                  className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-foreground"
-                                  placeholder="Unit"
-                                  autoComplete="off"
-                                />
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <Button type="button" onClick={submitInstructionDraft}>
-                      {editingInstructionIdx !== null ? "Save" : "Add"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={closeAddInstructionPanel}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-      ) : null}
-
-      {isAddIngredientOpen ? (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-background/80"
-            onClick={closeAddIngredientPanel}
-          />
-          <div className="fixed inset-x-0 bottom-24 z-50">
-            <div className="mx-auto w-full max-w-3xl px-4">
-              <div className="rounded-lg border border-border bg-background p-4">
-                <div className="flex flex-col gap-3">
-                  <p className="text-sm font-medium">
-                    {editingIngredientId !== null
-                      ? "Edit ingredient"
-                      : "Add ingredient"}
-                  </p>
-
-                  {ingredientsError ? (
-                    <p className="text-sm text-red-600">{ingredientsError}</p>
-                  ) : null}
-
-                  <label className="flex flex-col gap-1">
-                    <span className="text-xs text-muted-foreground">Name</span>
-                    <input
-                      value={ingredientDraftName}
-                      onChange={(e) =>
-                        onChangeIngredientDraftName(e.target.value)
-                      }
-                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground"
-                      placeholder="e.g. Salmon"
-                      autoComplete="off"
-                      list="ingredient-name-suggestions"
-                    />
-                    {availableIngredients.length ? (
-                      <datalist id="ingredient-name-suggestions">
-                        {availableIngredients.map((ing) => (
-                          <option key={ing.id} value={ing.name} />
-                        ))}
-                      </datalist>
-                    ) : null}
-                  </label>
-
-                  {availableIngredients.length ? (
-                    <label className="flex flex-col gap-1">
-                      <span className="text-xs text-muted-foreground">
-                        Or pick from list
-                      </span>
-                      <input
-                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground"
-                        value={ingredientPickerQuery}
-                        onChange={(e) => {
-                          setIngredientPickerQuery(e.target.value)
-                          setIsIngredientPickerOpen(true)
-                        }}
-                        onFocus={() => setIsIngredientPickerOpen(true)}
-                        onBlur={() => setIsIngredientPickerOpen(false)}
-                        placeholder="Start typing to search…"
-                        autoComplete="off"
-                      />
-
-                      {isIngredientPickerOpen ? (
-                        <div className="max-h-56 overflow-auto rounded-md border border-border bg-background">
-                          {groupedIngredientMatches.length ? (
-                            <div className="p-2">
-                              {groupedIngredientMatches.map((group) => (
-                                <div key={group.category} className="mb-2">
-                                  <p className="px-2 py-1 text-xs font-medium text-muted-foreground">
-                                    {group.category}
-                                  </p>
-                                  <div className="flex flex-col">
-                                    {group.items.map((ing) => (
-                                      <button
-                                        key={ing.id}
-                                        type="button"
-                                        className="rounded-md px-2 py-2 text-left text-sm hover:bg-muted"
-                                        onMouseDown={(e) => {
-                                          e.preventDefault()
-                                          onSelectDraftIngredientSource(
-                                            String(ing.id)
-                                          )
-                                          setIsIngredientPickerOpen(false)
-                                        }}
-                                      >
-                                        {ing.name}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="p-3 text-sm text-muted-foreground">
-                              No matches.
-                            </p>
-                          )}
-                        </div>
-                      ) : null}
-                    </label>
-                  ) : null}
-
-                  {ingredientDraftName.trim() && !ingredientDraftSourceId ? (
-                    <p className="text-xs text-muted-foreground">
-                      Choose an existing ingredient name (this recipe save
-                      requires an ingredient that already exists).
-                    </p>
-                  ) : null}
-
-                  {ingredientDraftError ? (
-                    <p className="text-sm text-red-600">
-                      {ingredientDraftError}
-                    </p>
-                  ) : null}
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      step="any"
-                      value={ingredientDraftQuantity}
-                      onChange={(e) =>
-                        setIngredientDraftQuantity(e.target.value)
-                      }
-                      className="w-28 rounded-md border border-border bg-background px-3 py-2 text-foreground"
-                      placeholder="Qty"
-                    />
-                    <input
-                      value={ingredientDraftUnit}
-                      onChange={(e) => setIngredientDraftUnit(e.target.value)}
-                      className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-foreground"
-                      placeholder="Unit (e.g. tbsp)"
-                      autoComplete="off"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <Button
-                      type="button"
-                      onClick={() => {
-                        const hasMatch = Boolean(ingredientDraftSourceId)
-                        if (!hasMatch) {
-                          setIngredientDraftError(
-                            "Pick an ingredient that already exists (use the suggestions/list)."
-                          )
-                          return
-                        }
-
-                        submitIngredientDraft()
-                      }}
-                      disabled={
-                        !availableIngredients.length && !ingredientDraftSourceId
-                      }
-                    >
-                      {editingIngredientId !== null ? "Save" : "Add"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => {
-                        setNewIngredientName(ingredientDraftName.trim())
-                        setNewIngredientCategory("")
-                        setNewIngredientUnit(ingredientDraftUnit.trim())
-                        setIsCreateIngredientOpen(true)
-                      }}
-                    >
-                      Create new ingredient
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={closeAddIngredientPanel}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-      ) : null}
-
-      {isCreateIngredientOpen ? (
-        <>
-          <div
-            className="fixed inset-0 z-50 bg-background/80"
-            onClick={() => setIsCreateIngredientOpen(false)}
-          />
-          <div className="fixed inset-x-0 bottom-24 z-50">
-            <div className="mx-auto w-full max-w-3xl px-4">
-              <div className="rounded-lg border border-border bg-background p-4">
-                <div className="flex flex-col gap-3">
-                  <p className="text-sm font-medium">Create ingredient</p>
-
-                  {createIngredientState.status === "error" ? (
-                    <p className="text-sm text-red-600">
-                      {createIngredientState.message}
-                    </p>
-                  ) : null}
-
-                  <label className="flex flex-col gap-1">
-                    <span className="text-xs text-muted-foreground">Name</span>
-                    <input
-                      value={newIngredientName}
-                      onChange={(e) => setNewIngredientName(e.target.value)}
-                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground"
-                      placeholder="e.g. Salmon"
-                      autoComplete="off"
-                    />
-                  </label>
-
-                  <label className="flex flex-col gap-1">
-                    <span className="text-xs text-muted-foreground">
-                      Category (optional)
-                    </span>
-                    <input
-                      value={newIngredientCategory}
-                      onChange={(e) => {
-                        setNewIngredientCategory(e.target.value)
-                        setIsCategorySuggestionsOpen(true)
-                      }}
-                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground"
-                      placeholder="e.g. Protein"
-                      autoComplete="off"
-                      onFocus={() => setIsCategorySuggestionsOpen(true)}
-                      onBlur={() => setIsCategorySuggestionsOpen(false)}
-                    />
-
-                    {isCategorySuggestionsOpen &&
-                    filteredCategoryOptions.length ? (
-                      <div className="max-h-40 overflow-auto rounded-md border border-border bg-background">
-                        <div className="p-2">
-                          {filteredCategoryOptions.map((c) => (
-                            <button
-                              key={c}
-                              type="button"
-                              className="w-full rounded-md px-2 py-2 text-left text-sm hover:bg-muted"
-                              onMouseDown={(e) => {
-                                e.preventDefault()
-                                setNewIngredientCategory(c)
-                                setIsCategorySuggestionsOpen(false)
-                              }}
-                            >
-                              {c}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-                  </label>
-
-                  <label className="flex flex-col gap-1">
-                    <span className="text-xs text-muted-foreground">
-                      Default unit (optional)
-                    </span>
-                    <input
-                      value={newIngredientUnit}
-                      onChange={(e) => setNewIngredientUnit(e.target.value)}
-                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground"
-                      placeholder="e.g. tbsp"
-                      autoComplete="off"
-                    />
-                  </label>
-
-                  <div className="flex items-center gap-3">
-                    <Button
-                      type="button"
-                      disabled={
-                        isCreatingIngredient || !newIngredientName.trim()
-                      }
-                      onClick={submitCreateIngredientDraft}
-                    >
-                      {isCreatingIngredient ? "Creating…" : "Create"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => setIsCreateIngredientOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-      ) : null}
+      <CreateIngredientSheet
+        open={canCreateIngredients && isCreateIngredientOpen}
+        createIngredientState={createIngredientState}
+        isCreatingIngredient={isCreatingIngredient}
+        createIngredientNameInputRef={createIngredientNameInputRef}
+        newIngredientName={newIngredientName}
+        newIngredientCategory={newIngredientCategory}
+        newIngredientUnit={newIngredientUnit}
+        filteredCategoryOptions={filteredCategoryOptions}
+        isCategorySuggestionsOpen={isCategorySuggestionsOpen}
+        highlightedCategoryOption={highlightedCategoryOption}
+        onNameChange={setNewIngredientName}
+        onCategoryChange={onChangeCategoryQuery}
+        onCategoryKeyDown={onCategorySuggestionsKeyDown}
+        onCategoryFocus={() => setIsCategorySuggestionsOpen(true)}
+        onCategoryBlur={() => setIsCategorySuggestionsOpen(false)}
+        onUnitChange={setNewIngredientUnit}
+        onHighlightCategory={setHighlightedCategoryOption}
+        onSelectCategory={setNewIngredientCategory}
+        onSetCategorySuggestionsOpen={setIsCategorySuggestionsOpen}
+        onSubmit={submitCreateIngredientDraft}
+        onClose={() => setIsCreateIngredientOpen(false)}
+      />
     </form>
   )
 }

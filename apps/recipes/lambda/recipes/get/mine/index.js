@@ -98,7 +98,23 @@ exports.handler = async (event, context) => {
     const pool = await getPool()
 
     const result = await pool.query(
-      "select id, name, created_at, updated_at from recipes where created_by_sub = $1 order by created_at desc",
+      `
+        select
+          r.id,
+          r.name,
+          r.created_at,
+          r.updated_at,
+          coalesce(
+            array_agg(distinct i.name) filter (where i.name is not null),
+            '{}'
+          ) as ingredient_names
+        from recipes r
+        left join recipe_ingredients ri on ri.recipe_id = r.id
+        left join ingredients i on i.id = ri.ingredient_id
+        where r.created_by_sub = $1
+        group by r.id, r.name, r.created_at, r.updated_at
+        order by r.created_at desc
+      `,
       [sub]
     )
 

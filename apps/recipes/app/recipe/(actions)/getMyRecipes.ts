@@ -8,6 +8,7 @@ import { ID_TOKEN_COOKIE_NAME } from "@recipes/utils/authCookies"
 export type MyRecipeListItem = {
   id: number
   name: string
+  ingredient_names?: string[]
   created_at?: string
   updated_at?: string
 }

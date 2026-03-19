@@ -31,7 +31,11 @@ export const MOCK_DATA = {
     { id: 11, name: "Green Onions", category: "Vegetables" },
     { id: 12, name: "Butter", category: "Dairy & Eggs" },
     { id: 13, name: "Parsley", category: "Herbs & Spices" },
-    { id: 14, name: "Lemon", category: "Fruits" }
+    { id: 14, name: "Lemon", category: "Fruits" },
+    { id: 15, name: "Ginger", category: "Vegetables" },
+    { id: 16, name: "Cornstarch", category: "Baking Ingredients" },
+    { id: 17, name: "Beef Broth", category: "Beverages" },
+    { id: 18, name: "Sugar", category: "Sweeteners" }
   ],
   recipe: {
     id: 4,

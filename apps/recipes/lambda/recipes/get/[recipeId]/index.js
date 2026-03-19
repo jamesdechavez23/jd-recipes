@@ -116,7 +116,7 @@ exports.handler = async (event, context) => {
     }
 
     const ingredientsResult = await pool.query(
-      'select ri.ingredient_id as "ingredientId", i.name, i.category, ri.quantity, ri.unit from recipe_ingredients ri join ingredients i on i.id = ri.ingredient_id where ri.recipe_id = $1 order by i.name asc',
+      'select ri.ingredient_id as "ingredientId", i.name, i.category, ri.quantity, ri.quantity_display as "quantityDisplay", ri.unit from recipe_ingredients ri join ingredients i on i.id = ri.ingredient_id where ri.recipe_id = $1 order by i.name asc',
       [recipeId]
     )
 
@@ -126,7 +126,7 @@ exports.handler = async (event, context) => {
     )
 
     const stepIngredientsResult = await pool.query(
-      'select rsi.recipe_step_id as "recipeStepId", rsi.ingredient_id as "ingredientId", rsi.quantity, rsi.unit from recipe_step_ingredients rsi join recipe_steps rs on rs.id = rsi.recipe_step_id where rs.recipe_id = $1 order by rs.step_number asc, rsi.ingredient_id asc',
+      'select rsi.recipe_step_id as "recipeStepId", rsi.ingredient_id as "ingredientId", rsi.quantity, rsi.quantity_display as "quantity_display", rsi.unit from recipe_step_ingredients rsi join recipe_steps rs on rs.id = rsi.recipe_step_id where rs.recipe_id = $1 order by rs.step_number asc, rsi.ingredient_id asc',
       [recipeId]
     )
 
@@ -138,6 +138,7 @@ exports.handler = async (event, context) => {
         list.push({
           ingredientId: row.ingredientId,
           quantity: row.quantity,
+          quantity_display: row.quantity_display,
           unit: row.unit
         })
       else {
@@ -145,6 +146,7 @@ exports.handler = async (event, context) => {
           {
             ingredientId: row.ingredientId,
             quantity: row.quantity,
+            quantity_display: row.quantity_display,
             unit: row.unit
           }
         ])

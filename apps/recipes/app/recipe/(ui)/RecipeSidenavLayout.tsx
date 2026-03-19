@@ -15,10 +15,61 @@ export default function RecipeSidenavLayout({
   children: React.ReactNode
 }) {
   const [collapsed, setCollapsed] = React.useState(false)
+  const [searchQuery, setSearchQuery] = React.useState("")
 
   const handleNav = React.useCallback(() => {
     setCollapsed(true)
   }, [])
+
+  const normalizedQuery = searchQuery.trim().toLowerCase()
+  const visibleRecipes = React.useMemo(() => {
+    if (!normalizedQuery) {
+      return recipes.map((recipe) => ({
+        recipe,
+        matchedIngredients: [] as string[]
+      }))
+    }
+
+    const rankedRecipes = recipes
+      .map((recipe, index) => {
+        const recipeNameMatches = recipe.name
+          .trim()
+          .toLowerCase()
+          .includes(normalizedQuery)
+        const matchedIngredients = (recipe.ingredient_names ?? []).filter(
+          (ingredientName) =>
+            ingredientName.trim().toLowerCase().includes(normalizedQuery)
+        )
+
+        if (!recipeNameMatches && matchedIngredients.length === 0) {
+          return null
+        }
+
+        return {
+          recipe,
+          matchedIngredients,
+          rank: recipeNameMatches ? 0 : 1,
+          index
+        }
+      })
+      .filter(
+        (
+          value
+        ): value is {
+          recipe: MyRecipeListItem
+          matchedIngredients: string[]
+          rank: number
+          index: number
+        } => Boolean(value)
+      )
+
+    rankedRecipes.sort((a, b) => {
+      if (a.rank !== b.rank) return a.rank - b.rank
+      return a.index - b.index
+    })
+
+    return rankedRecipes
+  }, [normalizedQuery, recipes])
 
   return (
     <div className="min-h-[calc(100vh-64px)] flex">
@@ -54,19 +105,51 @@ export default function RecipeSidenavLayout({
         {collapsed ? null : (
           <div className="flex flex-col gap-2">
             <h2 className="text-sm font-semibold">My Recipes</h2>
+            <div className="flex items-center gap-2">
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+                placeholder="Search recipes or ingredients..."
+                autoComplete="off"
+                aria-label="Search my recipes or ingredients"
+              />
+              {searchQuery ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSearchQuery("")}
+                >
+                  Clear
+                </Button>
+              ) : null}
+            </div>
             <div className="flex flex-col gap-1">
               {recipes.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No recipes yet.</p>
+              ) : visibleRecipes.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No recipes match your search.
+                </p>
               ) : (
-                recipes.map((r) => (
+                visibleRecipes.map(({ recipe, matchedIngredients }) => (
                   <Button
-                    key={r.id}
+                    key={recipe.id}
                     asChild
                     variant="ghost"
-                    className="justify-start"
+                    className="h-auto justify-start py-2"
                   >
-                    <Link href={`/recipe/${r.id}`} onClick={handleNav}>
-                      {r.name}
+                    <Link href={`/recipe/${recipe.id}`} onClick={handleNav}>
+                      <span className="flex flex-col items-start text-left">
+                        <span>{recipe.name}</span>
+                        {normalizedQuery && matchedIngredients.length > 0 ? (
+                          <span className="text-xs text-muted-foreground">
+                            Matched ingredient: {matchedIngredients[0]}
+                          </span>
+                        ) : null}
+                      </span>
                     </Link>
                   </Button>
                 ))

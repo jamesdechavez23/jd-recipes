@@ -2,6 +2,10 @@ import CreateRecipeForm from "./(ui)/CreateRecipeForm"
 import createRecipeAction from "./(actions)/createRecipeAction"
 import createIngredientAction from "./(actions)/createIngredientAction"
 import {
+  AdminAccessError,
+  requireAdminAccessToken
+} from "@recipes/utils/requireAdmin"
+import {
   getIngredients,
   type IngredientListItem
 } from "./(actions)/getIngredients"
@@ -9,6 +13,16 @@ import {
 export default async function CreateRecipePage() {
   let ingredients: IngredientListItem[] = []
   let ingredientsError: string | null = null
+  let canCreateIngredients = false
+
+  try {
+    await requireAdminAccessToken()
+    canCreateIngredients = true
+  } catch (error) {
+    if (!(error instanceof AdminAccessError)) {
+      throw error
+    }
+  }
 
   try {
     ingredients = await getIngredients()
@@ -21,6 +35,7 @@ export default async function CreateRecipePage() {
       <CreateRecipeForm
         createRecipeAction={createRecipeAction}
         createIngredientAction={createIngredientAction}
+        canCreateIngredients={canCreateIngredients}
         ingredients={ingredients}
         ingredientsError={ingredientsError}
       />

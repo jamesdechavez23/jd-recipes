@@ -10,6 +10,7 @@ export type RecipeIngredient = {
   name: string
   category?: string | null
   quantity?: number | null
+  quantityDisplay?: string | null
   unit?: string | null
 }
 

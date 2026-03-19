@@ -160,6 +160,10 @@ function parseIngredients(value) {
       item.unit === undefined || item.unit === null
         ? null
         : String(item.unit).trim() || null
+    const quantityDisplay =
+      item.quantity_display === undefined || item.quantity_display === null
+        ? null
+        : String(item.quantity_display).trim() || null
 
     if (quantity !== null && !unit) {
       return {
@@ -168,7 +172,12 @@ function parseIngredients(value) {
       }
     }
 
-    out.push({ ingredientId, quantity, unit })
+    out.push({
+      ingredientId,
+      quantity,
+      quantity_display: quantityDisplay,
+      unit
+    })
   }
 
   // de-dupe by ingredientId (first wins) while preserving order
@@ -293,6 +302,10 @@ function parseSteps(value) {
           si.unit === undefined || si.unit === null
             ? null
             : String(si.unit).trim() || null
+        const quantityDisplay =
+          si.quantity_display === undefined || si.quantity_display === null
+            ? null
+            : String(si.quantity_display).trim() || null
 
         if (quantity !== null && !unit) {
           return {
@@ -301,7 +314,12 @@ function parseSteps(value) {
           }
         }
 
-        stepIngredients.push({ ingredientId, quantity, unit })
+        stepIngredients.push({
+          ingredientId,
+          quantity,
+          quantity_display: quantityDisplay,
+          unit
+        })
       }
     }
 
@@ -412,8 +430,14 @@ exports.handler = async (event, context) => {
       if (ingredients.length > 0) {
         for (const ing of ingredients) {
           await client.query(
-            "insert into recipe_ingredients (recipe_id, ingredient_id, quantity, unit) values ($1, $2, $3, $4) on conflict (recipe_id, ingredient_id) do update set quantity = excluded.quantity, unit = excluded.unit",
-            [recipe.id, ing.ingredientId, ing.quantity, ing.unit]
+            "insert into recipe_ingredients (recipe_id, ingredient_id, quantity, quantity_display, unit) values ($1, $2, $3, $4, $5) on conflict (recipe_id, ingredient_id) do update set quantity = excluded.quantity, quantity_display = excluded.quantity_display, unit = excluded.unit",
+            [
+              recipe.id,
+              ing.ingredientId,
+              ing.quantity,
+              ing.quantity_display,
+              ing.unit
+            ]
           )
         }
       } else if (ingredientIds.length > 0) {
@@ -446,8 +470,14 @@ exports.handler = async (event, context) => {
           ) {
             for (const si of s.step_instructions) {
               await client.query(
-                "insert into recipe_step_ingredients (recipe_step_id, ingredient_id, quantity, unit) values ($1, $2, $3, $4) on conflict (recipe_step_id, ingredient_id) do update set quantity = excluded.quantity, unit = excluded.unit",
-                [recipeStepId, si.ingredientId, si.quantity, si.unit]
+                "insert into recipe_step_ingredients (recipe_step_id, ingredient_id, quantity, quantity_display, unit) values ($1, $2, $3, $4, $5) on conflict (recipe_step_id, ingredient_id) do update set quantity = excluded.quantity, quantity_display = excluded.quantity_display, unit = excluded.unit",
+                [
+                  recipeStepId,
+                  si.ingredientId,
+                  si.quantity,
+                  si.quantity_display,
+                  si.unit
+                ]
               )
             }
           }

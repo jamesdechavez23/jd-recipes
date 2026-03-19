@@ -1,4 +1,4 @@
-import { createRemoteJWKSet, jwtVerify } from "jose"
+import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose"
 
 function getRequiredEnv(name: string) {
   const value = process.env[name]
@@ -40,4 +40,50 @@ export async function verifyCognitoAccessToken(token: string) {
   }
 
   return payload
+}
+
+export function getCognitoGroups(payload: JWTPayload): string[] {
+  const rawGroups = payload["cognito:groups"]
+
+  if (Array.isArray(rawGroups)) {
+    return rawGroups
+      .filter((group): group is string => typeof group === "string")
+      .map((group) => group.trim())
+      .filter(Boolean)
+  }
+
+  if (typeof rawGroups === "string") {
+    const trimmed = rawGroups.trim()
+
+    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(trimmed)
+        if (Array.isArray(parsed)) {
+          return parsed
+            .filter((group): group is string => typeof group === "string")
+            .map((group) => group.trim())
+            .filter(Boolean)
+        }
+      } catch {
+        const inner = trimmed.slice(1, -1).trim()
+        if (!inner) return []
+
+        return inner
+          .split(",")
+          .map((group) => group.trim().replace(/^['\"]|['\"]$/g, ""))
+          .filter(Boolean)
+      }
+    }
+
+    return trimmed
+      .split(",")
+      .map((group) => group.trim())
+      .filter(Boolean)
+  }
+
+  return []
+}
+
+export function isCognitoAdmin(payload: JWTPayload): boolean {
+  return getCognitoGroups(payload).includes("admin")
 }

@@ -2,8 +2,10 @@
 
 import "server-only"
 
-import { cookies } from "next/headers"
-import { ID_TOKEN_COOKIE_NAME } from "@recipes/utils/authCookies"
+import {
+  AdminAccessError,
+  requireAdminAccessToken
+} from "@recipes/utils/requireAdmin"
 
 export type CreateIngredientActionState =
   | { status: "idle" }
@@ -33,15 +35,18 @@ export default async function createIngredientAction(
   _prevState: CreateIngredientActionState,
   formData: FormData
 ): Promise<CreateIngredientActionState> {
-  const cookieStore = await cookies()
-  const idToken = cookieStore.get(ID_TOKEN_COOKIE_NAME)?.value
-
-  if (!idToken) {
-    return {
-      status: "error",
-      httpStatus: 401,
-      message: "Missing auth token. Please log in again."
+  let accessToken: string
+  try {
+    ;({ accessToken } = await requireAdminAccessToken())
+  } catch (error) {
+    if (error instanceof AdminAccessError) {
+      return {
+        status: "error",
+        httpStatus: error.httpStatus,
+        message: error.message
+      }
     }
+    throw error
   }
 
   const name = asTrimmedString(formData.get("name"))
@@ -67,7 +72,7 @@ export default async function createIngredientAction(
       headers: {
         accept: "application/json",
         "content-type": "application/json",
-        authorization: `Bearer ${idToken}`
+        authorization: `Bearer ${accessToken}`
       },
       body: JSON.stringify(payload),
       cache: "no-store"
