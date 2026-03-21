@@ -27,7 +27,7 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body>
-        <header className="p-4 flex items-center justify-between gap-2 border-b">
+        <header className="flex items-center justify-between gap-2 border-b border-border/45 bg-background/90 p-4 backdrop-blur-sm">
           <Link
             href={homeHref}
             className="text-lg font-bold tracking-tight"

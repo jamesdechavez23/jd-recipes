@@ -6,6 +6,7 @@ import {
   AdminAccessError,
   requireAdminAccessToken
 } from "@recipes/utils/requireAdmin"
+import { createIngredient } from "@recipes/server/ingredients/createIngredient"
 
 export type CreateIngredientActionState =
   | { status: "idle" }
@@ -20,12 +21,6 @@ export type CreateIngredientActionState =
     }
   | { status: "error"; message: string; httpStatus?: number }
 
-function getRequiredEnv(name: string) {
-  const value = process.env[name]
-  if (!value) throw new Error(`Missing required environment variable: ${name}`)
-  return value
-}
-
 function asTrimmedString(value: FormDataEntryValue | null): string {
   if (typeof value !== "string") return ""
   return value.trim()
@@ -35,9 +30,8 @@ export default async function createIngredientAction(
   _prevState: CreateIngredientActionState,
   formData: FormData
 ): Promise<CreateIngredientActionState> {
-  let accessToken: string
   try {
-    ;({ accessToken } = await requireAdminAccessToken())
+    await requireAdminAccessToken()
   } catch (error) {
     if (error instanceof AdminAccessError) {
       return {
@@ -57,9 +51,6 @@ export default async function createIngredientAction(
     return { status: "error", message: "Ingredient name is required." }
   }
 
-  const base = getRequiredEnv("NEXT_PUBLIC_API_BASE_URL").replace(/\/+$/, "")
-  const url = `${base}/ingredients`
-
   const payload = {
     name,
     category: category || undefined,
@@ -67,74 +58,11 @@ export default async function createIngredientAction(
   }
 
   try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        "content-type": "application/json",
-        authorization: `Bearer ${accessToken}`
-      },
-      body: JSON.stringify(payload),
-      cache: "no-store"
-    })
-
-    const bodyText = await res.text()
-    let bodyJson: unknown = null
-    try {
-      bodyJson = JSON.parse(bodyText)
-    } catch {
-      bodyJson = null
-    }
-
-    if (!res.ok) {
-      const message =
-        (bodyJson && typeof bodyJson === "object" && bodyJson !== null
-          ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (bodyJson as any).error || (bodyJson as any).message
-          : null) ||
-        bodyText ||
-        "Request failed"
-
-      return {
-        status: "error",
-        httpStatus: res.status,
-        message: `POST ${url} -> ${res.status}: ${String(message)}`
-      }
-    }
-
-    if (bodyJson && typeof bodyJson === "object" && bodyJson !== null) {
-      // Expecting { ok: true, ingredient: ... }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const ingredient = (bodyJson as any).ingredient
-      if (ingredient && typeof ingredient === "object") {
-        const id = Number(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (ingredient as any).id
-        )
-        const ingName = String(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (ingredient as any).name ?? ""
-        )
-
-        if (Number.isInteger(id) && id > 0 && ingName) {
-          return {
-            status: "success",
-            ingredient: {
-              id,
-              name: ingName,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              category: ((ingredient as any).category ?? null) as any,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              unit: ((ingredient as any).unit ?? null) as any
-            }
-          }
-        }
-      }
-    }
+    const ingredient = await createIngredient(payload)
 
     return {
-      status: "error",
-      message: `POST ${url} -> ${res.status}: Unexpected response`
+      status: "success",
+      ingredient
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

@@ -9,7 +9,9 @@ import {
   useState
 } from "react"
 import { useRouter } from "next/navigation"
+import { Alert, AlertDescription } from "@repo/ui/shadcn/alert"
 import { Button } from "@repo/ui/shadcn/button"
+import ExpandableVideoFrame from "../../../(ui)/ExpandableVideoFrame"
 import ConfirmResetDialog from "./create-recipe-form/ConfirmResetDialog"
 import CreateIngredientSheet from "./create-recipe-form/CreateIngredientSheet"
 import IngredientEditorSheet from "./create-recipe-form/IngredientEditorSheet"
@@ -29,7 +31,7 @@ import {
   renumberInstructions,
   toYoutubeEmbedUrl
 } from "./create-recipe-form/utils"
-import type { IngredientListItem } from "../(actions)/getIngredients"
+import type { IngredientListItem } from "@recipes/server/ingredients/getIngredients"
 import type { CreateRecipeActionState } from "../(actions)/createRecipeAction"
 import type { CreateIngredientActionState } from "../(actions)/createIngredientAction"
 import VideoEditorSheet from "./create-recipe-form/VideoEditorSheet"
@@ -1329,6 +1331,142 @@ export default function CreateRecipeForm({
     }
   }
 
+  const recipeHeaderFields = (
+    <div className="flex flex-col gap-1">
+      <label className="sr-only" htmlFor="create-recipe-name">
+        Name
+      </label>
+      <input
+        id="create-recipe-name"
+        name="name"
+        required
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        className="w-full bg-transparent text-2xl font-bold text-foreground outline-none placeholder:text-muted-foreground"
+        placeholder="New recipe name"
+        autoComplete="off"
+      />
+
+      <label className="sr-only" htmlFor="create-recipe-description">
+        Description
+      </label>
+      <textarea
+        id="create-recipe-description"
+        name="description"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        className="w-full resize-none bg-transparent text-muted-foreground outline-none placeholder:text-muted-foreground"
+        placeholder="Optional description"
+        rows={2}
+      />
+    </div>
+  )
+
+  const openVideoEditor = () => {
+    setVideoDraftUrl(videoUrl)
+    setIsVideoEditorOpen(true)
+  }
+
+  const recipeVideoControls = videoUrl.trim() ? (
+    <div className="flex items-center gap-3">
+      <Button type="button" variant="secondary" onClick={openVideoEditor}>
+        Change video
+      </Button>
+      <Button type="button" variant="secondary" onClick={removeVideo}>
+        Remove video
+      </Button>
+    </div>
+  ) : null
+
+  const recipeErrorNotice =
+    actionState.status === "error" ? (
+      <Alert variant="destructive">
+        <AlertDescription>{actionState.message}</AlertDescription>
+      </Alert>
+    ) : null
+
+  const recipeSections = (
+    <RecipeSectionsToggle
+      ingredients={previewIngredients}
+      instructions={previewInstructions}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      instructionsTabLabel="Instructions (Alt+1)"
+      ingredientsTabLabel="Ingredients (Alt+2)"
+      onEditIngredient={openEditIngredient}
+      onEditInstruction={openEditInstruction}
+      onDeleteIngredient={deleteIngredient}
+      onDeleteInstruction={deleteInstruction}
+      onReorderInstruction={reorderInstruction}
+      ingredientsHeaderExtra={
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => {
+            setActiveTab("ingredients")
+            openAddPanelForActiveTab()
+          }}
+        >
+          Add ingredient (Alt+I)
+        </Button>
+      }
+      instructionsHeaderExtra={
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => {
+            setActiveTab("instructions")
+            openAddPanelForActiveTab()
+          }}
+        >
+          Add instruction (Alt+I)
+        </Button>
+      }
+      footerExtra={
+        <div className="flex w-full flex-wrap gap-2 md:w-auto md:flex-nowrap">
+          <Button
+            type="button"
+            variant="destructive"
+            className="flex-1 bg-destructive text-destructive-foreground hover:bg-destructive/85 md:flex-none"
+            onClick={() => setShowConfirmReset(true)}
+          >
+            Start over
+          </Button>
+          <Button
+            type="submit"
+            variant="success"
+            className="flex-1 md:flex-none"
+            disabled={isPending}
+          >
+            {isPending ? "Creating…" : "Create recipe (Ctrl+Enter)"}
+          </Button>
+        </div>
+      }
+    />
+  )
+
+  const expandedRecipeContent = videoEmbedUrl ? (
+    <div className="flex flex-col gap-6">
+      {recipeHeaderFields}
+
+      <div className="w-full overflow-hidden rounded">
+        <iframe
+          className="aspect-video w-full rounded"
+          ref={youtubeIframeRef}
+          src={videoEmbedUrl}
+          title={name.trim() || "Recipe video"}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerPolicy="strict-origin-when-cross-origin"
+          allowFullScreen
+        />
+      </div>
+
+      {recipeVideoControls}
+      {recipeErrorNotice}
+      {recipeSections}
+    </div>
+  ) : null
+
   return (
     <form
       ref={formRef}
@@ -1339,147 +1477,44 @@ export default function CreateRecipeForm({
       <input type="hidden" name="ingredientsJson" value={ingredientsJson} />
       <input type="hidden" name="instructionsJson" value={instructionsJson} />
 
-      <div className="flex flex-col gap-1">
-        <label className="sr-only" htmlFor="create-recipe-name">
-          Name
-        </label>
-        <input
-          id="create-recipe-name"
-          name="name"
-          required
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="w-full bg-transparent text-2xl font-bold text-foreground outline-none placeholder:text-muted-foreground"
-          placeholder="New recipe name"
-          autoComplete="off"
-        />
-
-        <label className="sr-only" htmlFor="create-recipe-description">
-          Description
-        </label>
-        <textarea
-          id="create-recipe-description"
-          name="description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          className="w-full resize-none bg-transparent text-muted-foreground outline-none placeholder:text-muted-foreground"
-          placeholder="Optional description"
-          rows={2}
-        />
-      </div>
-
       {videoEmbedUrl ? (
-        <iframe
-          className="aspect-video w-full rounded"
-          ref={youtubeIframeRef}
-          src={videoEmbedUrl}
-          title={name.trim() || "Recipe video"}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          referrerPolicy="strict-origin-when-cross-origin"
-          allowFullScreen
-        />
-      ) : videoUrl.trim() ? (
-        <a
-          className="underline"
-          href={videoUrl}
-          target="_blank"
-          rel="noreferrer"
+        <ExpandableVideoFrame
+          reserveViewportHeight="34rem"
+          expandLabel="Expand section"
+          collapseLabel="Reset section size"
         >
-          Watch video
-        </a>
+          {expandedRecipeContent}
+        </ExpandableVideoFrame>
       ) : (
-        <div className="flex items-center gap-3">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => {
-              setVideoDraftUrl(videoUrl)
-              setIsVideoEditorOpen(true)
-            }}
-          >
-            Add video
-          </Button>
-        </div>
+        <>
+          {recipeHeaderFields}
+
+          {videoUrl.trim() ? (
+            <a
+              className="underline"
+              href={videoUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Watch video
+            </a>
+          ) : (
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={openVideoEditor}
+              >
+                Add video
+              </Button>
+            </div>
+          )}
+
+          {recipeVideoControls}
+          {recipeErrorNotice}
+          {recipeSections}
+        </>
       )}
-
-      {videoUrl.trim() ? (
-        <div className="flex items-center gap-3">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => {
-              setVideoDraftUrl(videoUrl)
-              setIsVideoEditorOpen(true)
-            }}
-          >
-            Change video
-          </Button>
-          <Button type="button" variant="secondary" onClick={removeVideo}>
-            Remove video
-          </Button>
-        </div>
-      ) : null}
-
-      {actionState.status === "error" ? (
-        <p className="text-sm text-red-600">{actionState.message}</p>
-      ) : null}
-
-      <RecipeSectionsToggle
-        ingredients={previewIngredients}
-        instructions={previewInstructions}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        instructionsTabLabel="Instructions (Alt+1)"
-        ingredientsTabLabel="Ingredients (Alt+2)"
-        onEditIngredient={openEditIngredient}
-        onEditInstruction={openEditInstruction}
-        onDeleteIngredient={deleteIngredient}
-        onDeleteInstruction={deleteInstruction}
-        onReorderInstruction={reorderInstruction}
-        ingredientsHeaderExtra={
-          <>
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => {
-                setActiveTab("ingredients")
-                openAddPanelForActiveTab()
-              }}
-            >
-              Add ingredient (Alt+I)
-            </Button>
-          </>
-        }
-        instructionsHeaderExtra={
-          <>
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => {
-                setActiveTab("instructions")
-                openAddPanelForActiveTab()
-              }}
-            >
-              Add instruction (Alt+I)
-            </Button>
-          </>
-        }
-        footerExtra={
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="destructive"
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/85"
-              onClick={() => setShowConfirmReset(true)}
-            >
-              Start over
-            </Button>
-            <Button type="submit" variant="success" disabled={isPending}>
-              {isPending ? "Creating…" : "Create recipe (Ctrl+Enter)"}
-            </Button>
-          </div>
-        }
-      />
 
       <ConfirmResetDialog
         open={showConfirmReset}

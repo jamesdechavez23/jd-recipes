@@ -3,7 +3,10 @@
 import { useActionState } from "react"
 import Link from "next/link"
 
+import { Alert, AlertDescription } from "@repo/ui/shadcn/alert"
 import { Button } from "@repo/ui/shadcn/button"
+import { Input } from "@repo/ui/shadcn/input"
+import { Label } from "@repo/ui/shadcn/label"
 
 import loginCognitoUserAction, {
   type LoginState
@@ -15,39 +18,35 @@ export default function LoginForm({ redirectTo }: { redirectTo: string }) {
   } satisfies LoginState)
 
   return (
-    <div className="max-w-sm space-y-4">
+    <div className="space-y-4">
       {state.status === "error" ? (
-        <p className="text-sm text-destructive">{state.message}</p>
+        <Alert variant="destructive">
+          <AlertDescription>{state.message}</AlertDescription>
+        </Alert>
       ) : null}
 
       <form action={action} className="space-y-4">
         <input type="hidden" name="redirect" value={redirectTo} />
 
         <div className="space-y-1">
-          <label htmlFor="email" className="text-sm font-medium">
-            Email
-          </label>
-          <input
+          <Label htmlFor="email">Email</Label>
+          <Input
             id="email"
             name="email"
             type="email"
             autoComplete="email"
             required
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
           />
         </div>
 
         <div className="space-y-1">
-          <label htmlFor="password" className="text-sm font-medium">
-            Password
-          </label>
-          <input
+          <Label htmlFor="password">Password</Label>
+          <Input
             id="password"
             name="password"
             type="password"
             autoComplete="current-password"
             required
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
           />
         </div>
 

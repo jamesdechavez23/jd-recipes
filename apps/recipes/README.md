@@ -1,28 +1,179 @@
-## Getting Started
+# Recipes App
 
-First, run the development server:
+This app is the main Next.js frontend and backend for JD Recipes.
+
+The current architecture uses:
+
+- Next.js App Router
+- Server Actions for authenticated mutations and reads
+- Direct PostgreSQL access through `pg`
+- AWS Cognito for authentication
+- AWS Secrets Manager for database credentials in deployed environments
+- An SSM tunnel for local development against the remote database
+
+The old API Gateway and Lambda flow has been removed from the main app.
+
+## Development
+
+From the repository root:
 
 ```bash
-yarn dev
+npm install
 ```
 
-Open [http://localhost:3001](http://localhost:3001) with your browser to see the result.
+To run the app only:
 
-You can start editing the page by modifying `src/app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run dev
+```
 
-To create [API routes](https://nextjs.org/docs/app/building-your-application/routing/router-handlers) add an `api/` directory to the `app/` directory with a `route.ts` file. For individual endpoints, create a subfolder in the `api` directory, like `api/hello/route.ts` would map to [http://localhost:3001/api/hello](http://localhost:3001/api/hello).
+To run the app with the SSM tunnel in parallel:
 
-## Learn More
+```bash
+npm run dev:tunnel
+```
 
-To learn more about Next.js, take a look at the following resources:
+The app runs on:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn/foundations/about-nextjs) - an interactive Next.js tutorial.
+```text
+http://localhost:3000
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+## Useful Commands
 
-## Deploy on Vercel
+From the repository root:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_source=github.com&utm_medium=referral&utm_campaign=turborepo-readme) from the creators of Next.js.
+```bash
+npm run dev
+npm run dev:tunnel
+npm run tunnel
+npm run lint
+npm run check-types
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+From `apps/recipes` directly:
+
+```bash
+npm run dev
+npm run build
+npm run start
+npm run lint
+npm run check-types
+```
+
+## Environment
+
+The app currently expects values similar to the following in `apps/recipes/.env`:
+
+```dotenv
+NEXT_PUBLIC_COGNITO_REGION=...
+NEXT_PUBLIC_COGNITO_USER_POOL_ID=...
+NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID=...
+NEXT_PUBLIC_REDIRECT_ORIGIN=http://localhost:3000
+COGNITO_USER_POOL_CLIENT_SECRET=...
+
+DB_URL=...
+DB_SSL=true
+DB_SECRET_ARN=...
+DB_NAME=...
+DB_HOST=127.0.0.1
+DB_PORT=15432
+
+SSM_TUNNEL_TARGET=...
+```
+
+Important database config behavior:
+
+- If field-based DB settings are present, the app uses them instead of plain `DB_URL`
+- Field-based mode means any of these values can activate it: `DB_SECRET_ARN`, `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_DATABASE`
+- For local tunnel-based development, `DB_HOST=127.0.0.1` and `DB_PORT=15432` should point at the active SSM tunnel
+- In field-based mode, the app resolves missing credentials from Secrets Manager when `DB_SECRET_ARN` is set
+
+In practice, local development usually works best with:
+
+- the SSM tunnel running
+- `DB_HOST` and `DB_PORT` pointing to the tunnel
+- `DB_SECRET_ARN` available so username/password/database can be resolved from Secrets Manager
+
+## Auth Notes
+
+- Access tokens are used by the proxy for route protection and refresh decisions
+- ID tokens are used by server-side authenticated flows that need the current user identity
+- Admin-only actions rely on Cognito group checks from verified tokens
+
+If auth starts failing unexpectedly, confirm the Cognito app client values in `.env` match the tokens being issued.
+
+## Server Structure
+
+The app now keeps backend logic inside the Next.js workspace instead of a separate Lambda directory.
+
+Main areas:
+
+- `app/**/(actions)` for thin Server Actions
+- `server/db` for connection pooling and transaction helpers
+- `server/auth` for current-user helpers
+- `server/recipes` for recipe queries and mutations
+- `server/ingredients` for ingredient queries and mutations
+- `utils/cognitoJwt.ts` for Cognito token verification
+
+The intended pattern is:
+
+1. UI submits to a Server Action
+2. The Server Action handles validation and auth boundaries
+3. The action calls a server-only module under `server/**`
+4. The server module talks directly to PostgreSQL
+
+## Current Coverage
+
+The direct database path is in place for the main recipe flows, including:
+
+- creating recipes
+- listing the current user's recipes
+- loading ingredients for recipe creation
+- creating ingredients
+- loading a recipe by id
+
+## Troubleshooting
+
+### `ECONNREFUSED 127.0.0.1:15432`
+
+The SSM tunnel is not running or is not listening on the expected port.
+
+Start it with:
+
+```bash
+npm run tunnel
+```
+
+Or run both together:
+
+```bash
+npm run dev:tunnel
+```
+
+### Database config is incomplete
+
+This usually means field-based DB config is active but one or more required values are missing.
+
+Check:
+
+- `DB_SECRET_ARN`
+- `DB_HOST`
+- `DB_PORT`
+- `DB_NAME`
+- optional direct overrides such as `DB_USER` and `DB_PASSWORD`
+
+### Redirect loops or unexpected logouts
+
+Check:
+
+- Cognito env values
+- access token expiry
+- refresh token cookie presence
+- `NEXT_PUBLIC_REDIRECT_ORIGIN`
+
+## Notes For Future Changes
+
+- Keep reusable types out of `"use server"` action files when those types are imported by UI code
+- Prefer putting shared types in `server/**` or other non-action modules to avoid Next bundling issues
+- Keep `redirect()` calls outside `try/catch` blocks in Server Actions unless redirect errors are explicitly rethrown

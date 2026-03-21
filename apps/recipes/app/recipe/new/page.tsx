@@ -5,10 +5,8 @@ import {
   AdminAccessError,
   requireAdminAccessToken
 } from "@recipes/utils/requireAdmin"
-import {
-  getIngredients,
-  type IngredientListItem
-} from "./(actions)/getIngredients"
+import { getIngredients } from "./(actions)/getIngredients"
+import type { IngredientListItem } from "@recipes/server/ingredients/getIngredients"
 
 export default async function CreateRecipePage() {
   let ingredients: IngredientListItem[] = []

@@ -3,9 +3,18 @@
 import "server-only"
 
 import { revalidatePath } from "next/cache"
-import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
-import { ID_TOKEN_COOKIE_NAME } from "@recipes/utils/authCookies"
+import {
+  CreateRecipeError,
+  createRecipe,
+  type RecipeIngredientInput,
+  type RecipeStepInput,
+  type RecipeStepIngredientInput
+} from "@recipes/server/recipes/createRecipe"
+import {
+  CurrentUserError,
+  requireCurrentUser
+} from "@recipes/server/auth/requireCurrentUser"
 
 export type CreateRecipeActionState =
   | { status: "idle" }
@@ -20,46 +29,25 @@ function tryGetRecipeId(recipe: unknown): number | null {
   return Number.isInteger(id) && id > 0 ? id : null
 }
 
-function getRequiredEnv(name: string) {
-  const value = process.env[name]
-  if (!value) throw new Error(`Missing required environment variable: ${name}`)
-  return value
-}
-
 function asTrimmedString(value: FormDataEntryValue | null): string {
   if (typeof value !== "string") return ""
   return value.trim()
 }
 
-function parseInstructions(raw: string): string[] {
+function parseInstructions(raw: string): RecipeStepInput[] {
   // Treat each non-empty line as a step.
   return raw
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
-}
-
-type RecipeStepIngredientInput = {
-  ingredientId: number
-  quantity?: number | null
-  quantity_display?: string | null
-  unit?: string | null
-}
-
-type RecipeStepInput = {
-  step: number
-  short_desc?: string
-  long_desc?: string
-  heat?: string
-  time_minutes?: number | null
-  step_instructions?: RecipeStepIngredientInput[]
-}
-
-type RecipeIngredientInput = {
-  ingredientId: number
-  quantity?: number | null
-  quantity_display?: string | null
-  unit?: string | null
+    .map((line, index) => ({
+      step: index + 1,
+      short_desc: line,
+      long_desc: undefined,
+      heat: undefined,
+      time_minutes: undefined,
+      step_instructions: []
+    }))
 }
 
 function parseInstructionsJson(
@@ -289,10 +277,18 @@ export default async function createRecipeAction(
   _prevState: CreateRecipeActionState,
   formData: FormData
 ): Promise<CreateRecipeActionState> {
-  const cookieStore = await cookies()
-  const idToken = cookieStore.get(ID_TOKEN_COOKIE_NAME)?.value
+  let currentUser
+  try {
+    currentUser = await requireCurrentUser()
+  } catch (error) {
+    if (error instanceof CurrentUserError) {
+      return {
+        status: "error",
+        httpStatus: error.httpStatus,
+        message: error.message
+      }
+    }
 
-  if (!idToken) {
     return {
       status: "error",
       httpStatus: 401,
@@ -335,10 +331,8 @@ export default async function createRecipeAction(
     }
   }
 
-  const base = getRequiredEnv("NEXT_PUBLIC_API_BASE_URL").replace(/\/+$/, "")
-  const url = `${base}/recipes`
-
   const payload = {
+    createdBySub: currentUser.sub,
     name,
     description: description || undefined,
     videoUrl: videoUrl || undefined,
@@ -350,51 +344,17 @@ export default async function createRecipeAction(
   let createdRecipe: unknown = null
 
   try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        "content-type": "application/json",
-        authorization: `Bearer ${idToken}`
-      },
-      body: JSON.stringify(payload),
-      cache: "no-store"
-    })
-
-    const bodyText = await res.text()
-    let bodyJson: unknown = null
-    try {
-      bodyJson = JSON.parse(bodyText)
-    } catch {
-      bodyJson = null
-    }
-
-    if (!res.ok) {
-      const message =
-        (bodyJson && typeof bodyJson === "object" && bodyJson !== null
-          ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (bodyJson as any).error || (bodyJson as any).message
-          : null) ||
-        bodyText ||
-        "Request failed"
-
+    createdRecipe = await createRecipe(payload)
+    recipeId = tryGetRecipeId(createdRecipe)
+  } catch (err) {
+    if (err instanceof CreateRecipeError) {
       return {
         status: "error",
-        httpStatus: res.status,
-        message: `POST ${url} -> ${res.status}: ${String(message)}`
+        httpStatus: err.httpStatus,
+        message: err.message
       }
     }
 
-    // Expecting { ok: true, recipe: ... }
-    if (bodyJson && typeof bodyJson === "object" && bodyJson !== null) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const recipe = (bodyJson as any).recipe ?? bodyJson
-      createdRecipe = recipe
-      recipeId = tryGetRecipeId(recipe)
-    } else {
-      createdRecipe = bodyText
-    }
-  } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return { status: "error", message }
   }

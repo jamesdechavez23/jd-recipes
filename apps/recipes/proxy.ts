@@ -6,11 +6,10 @@ import {
   REFRESH_TOKEN_COOKIE_NAME,
   USERNAME_COOKIE_NAME
 } from "./utils/authCookies"
-import { isCognitoAdmin, verifyCognitoAccessToken } from "./utils/cognitoJwt"
+import { verifyCognitoAccessToken } from "./utils/cognitoJwt"
 
 const REFRESH_PATH = "/api/auth/refresh"
 const REFRESH_IF_EXPIRING_IN_SECONDS = 60
-const ADMIN_ONLY_PATHS = ["/api-smoketest"]
 
 export async function proxy(req: NextRequest) {
   const accessToken = req.cookies.get(ACCESS_TOKEN_COOKIE_NAME)?.value
@@ -38,11 +37,6 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL("/recipe", req.url))
   }
 
-  const isAdminOnlyPath = ADMIN_ONLY_PATHS.some(
-    (adminPath) =>
-      pathname === adminPath || pathname.startsWith(`${adminPath}/`)
-  )
-
   if (pathname === REFRESH_PATH || pathname.startsWith(`${REFRESH_PATH}/`)) {
     return NextResponse.next()
   }
@@ -67,10 +61,6 @@ export async function proxy(req: NextRequest) {
 
     if (isPublicPath) {
       return NextResponse.redirect(`${redirectOrigin}/recipe`)
-    }
-
-    if (isAdminOnlyPath && !isCognitoAdmin(payload)) {
-      return redirectToRecipe()
     }
 
     return NextResponse.next()

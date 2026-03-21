@@ -21,11 +21,13 @@ function getRemoteJwks() {
   return remoteJwks
 }
 
+function getExpectedClientId() {
+  return getRequiredEnv("NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID")
+}
+
 export async function verifyCognitoAccessToken(token: string) {
   const issuer = getCognitoIssuer()
-  const expectedClientId = getRequiredEnv(
-    "NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID"
-  )
+  const expectedClientId = getExpectedClientId()
 
   const { payload } = await jwtVerify(token, getRemoteJwks(), {
     issuer
@@ -37,6 +39,29 @@ export async function verifyCognitoAccessToken(token: string) {
 
   if (payload.client_id !== expectedClientId) {
     throw new Error("JWT client_id does not match this app client")
+  }
+
+  return payload
+}
+
+export async function verifyCognitoIdToken(token: string) {
+  const issuer = getCognitoIssuer()
+  const expectedClientId = getExpectedClientId()
+
+  const { payload } = await jwtVerify(token, getRemoteJwks(), {
+    issuer
+  })
+
+  if (payload.token_use !== "id") {
+    throw new Error("JWT is not an id token")
+  }
+
+  const audiences = [payload.aud, payload.client_id].filter(
+    (value): value is string => typeof value === "string" && value.length > 0
+  )
+
+  if (!audiences.includes(expectedClientId)) {
+    throw new Error("JWT audience does not match this app client")
   }
 
   return payload

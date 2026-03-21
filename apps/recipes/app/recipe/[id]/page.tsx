@@ -1,5 +1,7 @@
 import RecipeSectionsToggle from "./(ui)/RecipeSectionsToggle"
 import getRecipeById from "./(actions)/getRecipeById"
+import ExpandableVideoFrame from "../../(ui)/ExpandableVideoFrame"
+import { toYoutubeEmbedUrl } from "../new/(ui)/create-recipe-form/utils"
 export const MOCK_DATA = {
   ingredientCategories: [
     "Proteins",
@@ -104,39 +106,6 @@ export const MOCK_DATA = {
   ]
 }
 
-function toYoutubeEmbedUrl(url: string): string | null {
-  try {
-    const parsed = new URL(url)
-
-    const buildEmbed = (id: string) =>
-      `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1`
-
-    // https://youtu.be/<id>
-    if (parsed.hostname === "youtu.be") {
-      const id = parsed.pathname.replace("/", "").trim()
-      return id ? buildEmbed(id) : null
-    }
-
-    // https://www.youtube.com/watch?v=<id>
-    if (
-      parsed.hostname === "www.youtube.com" ||
-      parsed.hostname === "youtube.com" ||
-      parsed.hostname === "m.youtube.com"
-    ) {
-      const pathParts = parsed.pathname.split("/").filter(Boolean)
-      if (pathParts[0] === "embed" && pathParts[1]) {
-        return buildEmbed(pathParts[1])
-      }
-      const id = parsed.searchParams.get("v")
-      return id ? buildEmbed(id) : null
-    }
-
-    return null
-  } catch {
-    return null
-  }
-}
-
 type RecipePageProps = {
   params: { id?: string | string[] } | Promise<{ id?: string | string[] }>
 }
@@ -172,37 +141,63 @@ export default async function RecipePage({ params }: RecipePageProps) {
 
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold">{recipe.name}</h1>
-        {recipe.description ? (
-          <p className="text-muted-foreground">{recipe.description}</p>
-        ) : null}
-      </div>
-
       {videoEmbedUrl ? (
-        <iframe
-          className="aspect-video w-full rounded"
-          src={videoEmbedUrl}
-          title={recipe.name}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          referrerPolicy="strict-origin-when-cross-origin"
-          allowFullScreen
-        />
-      ) : videoUrl ? (
-        <a
-          className="underline"
-          href={videoUrl}
-          target="_blank"
-          rel="noreferrer"
+        <ExpandableVideoFrame
+          reserveViewportHeight="18rem"
+          expandLabel="Expand section"
+          collapseLabel="Reset section size"
         >
-          Watch video
-        </a>
-      ) : null}
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-1">
+              <h1 className="text-2xl font-bold">{recipe.name}</h1>
+              {recipe.description ? (
+                <p className="text-muted-foreground">{recipe.description}</p>
+              ) : null}
+            </div>
 
-      <RecipeSectionsToggle
-        ingredients={recipe.ingredients}
-        instructions={instructions}
-      />
+            <div className="w-full overflow-hidden rounded">
+              <iframe
+                className="aspect-video w-full rounded"
+                src={videoEmbedUrl}
+                title={recipe.name}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allowFullScreen
+              />
+            </div>
+
+            <RecipeSectionsToggle
+              ingredients={recipe.ingredients}
+              instructions={instructions}
+            />
+          </div>
+        </ExpandableVideoFrame>
+      ) : (
+        <>
+          <div className="flex flex-col gap-1">
+            <h1 className="text-2xl font-bold">{recipe.name}</h1>
+            {recipe.description ? (
+              <p className="text-muted-foreground">{recipe.description}</p>
+            ) : null}
+          </div>
+
+          {videoUrl ? (
+            <a
+              className="underline"
+              href={videoUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Watch video
+            </a>
+          ) : null}
+
+          <RecipeSectionsToggle
+            ingredients={recipe.ingredients}
+            instructions={instructions}
+          />
+        </>
+      )}
     </main>
   )
 }

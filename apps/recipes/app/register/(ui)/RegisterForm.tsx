@@ -3,7 +3,10 @@
 import { useActionState } from "react"
 import Link from "next/link"
 
+import { Alert, AlertDescription } from "@repo/ui/shadcn/alert"
 import { Button } from "@repo/ui/shadcn/button"
+import { Input } from "@repo/ui/shadcn/input"
+import { Label } from "@repo/ui/shadcn/label"
 
 import confirmCognitoUserAction from "../(actions)/confirmCognitoUserAction"
 import registerCognitoUserAction, {
@@ -29,52 +32,45 @@ export default function RegisterForm() {
         : null
 
   return (
-    <div className="max-w-sm space-y-4">
+    <div className="space-y-4">
       {errorMessage ? (
-        <p className="text-sm text-destructive">{errorMessage}</p>
+        <Alert variant="destructive">
+          <AlertDescription>{errorMessage}</AlertDescription>
+        </Alert>
       ) : null}
 
       {registerState.status !== "needs-confirmation" ? (
         <form action={registerAction} className="space-y-4">
           <div className="space-y-1">
-            <label htmlFor="email" className="text-sm font-medium">
-              Email
-            </label>
-            <input
+            <Label htmlFor="email">Email</Label>
+            <Input
               id="email"
               name="email"
               type="email"
               autoComplete="email"
               required
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
             />
           </div>
 
           <div className="space-y-1">
-            <label htmlFor="password" className="text-sm font-medium">
-              Password
-            </label>
-            <input
+            <Label htmlFor="password">Password</Label>
+            <Input
               id="password"
               name="password"
               type="password"
               autoComplete="new-password"
               required
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
             />
           </div>
 
           <div className="space-y-1">
-            <label htmlFor="confirmPassword" className="text-sm font-medium">
-              Confirm password
-            </label>
-            <input
+            <Label htmlFor="confirmPassword">Confirm password</Label>
+            <Input
               id="confirmPassword"
               name="confirmPassword"
               type="password"
               autoComplete="new-password"
               required
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
             />
           </div>
 
@@ -96,30 +92,25 @@ export default function RegisterForm() {
           </p>
 
           <div className="space-y-1">
-            <label htmlFor="email" className="text-sm font-medium">
-              Email
-            </label>
-            <input
+            <Label htmlFor="email">Email</Label>
+            <Input
               id="email"
               name="email"
               type="email"
               defaultValue={registerState.email}
               readOnly
-              className="h-9 w-full rounded-md border border-input bg-muted px-3 text-sm text-foreground"
+              className="bg-muted"
             />
           </div>
 
           <div className="space-y-1">
-            <label htmlFor="code" className="text-sm font-medium">
-              Confirmation code
-            </label>
-            <input
+            <Label htmlFor="code">Confirmation code</Label>
+            <Input
               id="code"
               name="code"
               inputMode="numeric"
               autoComplete="one-time-code"
               required
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
             />
           </div>
 

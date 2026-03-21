@@ -1,5 +1,9 @@
+import { Alert, AlertDescription } from "@repo/ui/shadcn/alert"
 import { Button } from "@repo/ui/shadcn/button"
+import { Input } from "@repo/ui/shadcn/input"
+import { Label } from "@repo/ui/shadcn/label"
 import type { CreateIngredientActionState } from "../../(actions)/createIngredientAction"
+import BottomDockedSheet from "./BottomDockedSheet"
 
 interface CreateIngredientSheetProps {
   open: boolean
@@ -51,104 +55,110 @@ export default function CreateIngredientSheet({
   if (!open) return null
 
   return (
-    <>
-      <div className="fixed inset-0 z-50 bg-background/80" onClick={onClose} />
-      <div className="fixed inset-x-0 bottom-24 z-50">
-        <div className="mx-auto w-full max-w-3xl px-4">
-          <div className="rounded-lg border border-border bg-background p-4">
-            <div className="flex flex-col gap-3">
-              <p className="text-sm font-medium">Create ingredient</p>
+    <BottomDockedSheet
+      onClose={onClose}
+      overlayZIndexClassName="z-50"
+      sheetZIndexClassName="z-50"
+    >
+      <div className="flex flex-col gap-3">
+        <p className="text-sm font-medium">Create ingredient</p>
 
-              {createIngredientState.status === "error" ? (
-                <p className="text-sm text-red-600">
-                  {createIngredientState.message}
-                </p>
-              ) : null}
+        {createIngredientState.status === "error" ? (
+          <Alert variant="destructive">
+            <AlertDescription>{createIngredientState.message}</AlertDescription>
+          </Alert>
+        ) : null}
 
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">Name</span>
-                <input
-                  ref={createIngredientNameInputRef}
-                  value={newIngredientName}
-                  onChange={(e) => onNameChange(e.target.value)}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground"
-                  placeholder="e.g. Salmon"
-                  autoComplete="off"
-                />
-              </label>
+        <div className="flex flex-col gap-1">
+          <Label
+            htmlFor="create-ingredient-name"
+            className="text-xs text-muted-foreground"
+          >
+            Name
+          </Label>
+          <Input
+            id="create-ingredient-name"
+            ref={createIngredientNameInputRef}
+            value={newIngredientName}
+            onChange={(e) => onNameChange(e.target.value)}
+            placeholder="e.g. Salmon"
+            autoComplete="off"
+          />
+        </div>
 
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">
-                  Category (optional)
-                </span>
-                <input
-                  value={newIngredientCategory}
-                  onChange={(e) => onCategoryChange(e.target.value)}
-                  onKeyDown={onCategoryKeyDown}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground"
-                  placeholder="e.g. Protein"
-                  autoComplete="off"
-                  onFocus={onCategoryFocus}
-                  onBlur={onCategoryBlur}
-                />
+        <div className="flex flex-col gap-1">
+          <Label
+            htmlFor="create-ingredient-category"
+            className="text-xs text-muted-foreground"
+          >
+            Category (optional)
+          </Label>
+          <Input
+            id="create-ingredient-category"
+            value={newIngredientCategory}
+            onChange={(e) => onCategoryChange(e.target.value)}
+            onKeyDown={onCategoryKeyDown}
+            placeholder="e.g. Protein"
+            autoComplete="off"
+            onFocus={onCategoryFocus}
+            onBlur={onCategoryBlur}
+          />
 
-                {isCategorySuggestionsOpen && filteredCategoryOptions.length ? (
-                  <div className="max-h-40 overflow-auto rounded-md border border-border bg-background">
-                    <div className="p-2">
-                      {filteredCategoryOptions.map((category) => (
-                        <button
-                          key={category}
-                          type="button"
-                          className={
-                            "w-full rounded-md px-2 py-2 text-left text-sm hover:bg-muted " +
-                            (highlightedCategoryOption === category
-                              ? "bg-muted"
-                              : "")
-                          }
-                          onMouseEnter={() => onHighlightCategory(category)}
-                          onMouseDown={(e) => {
-                            e.preventDefault()
-                            onSelectCategory(category)
-                            onSetCategorySuggestionsOpen(false)
-                          }}
-                        >
-                          {category}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-              </label>
-
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">
-                  Default unit (optional)
-                </span>
-                <input
-                  value={newIngredientUnit}
-                  onChange={(e) => onUnitChange(e.target.value)}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground"
-                  placeholder="e.g. tbsp"
-                  autoComplete="off"
-                />
-              </label>
-
-              <div className="flex items-center gap-3">
-                <Button
-                  type="button"
-                  disabled={isCreatingIngredient || !newIngredientName.trim()}
-                  onClick={onSubmit}
-                >
-                  {isCreatingIngredient ? "Creating…" : "Create"}
-                </Button>
-                <Button type="button" variant="secondary" onClick={onClose}>
-                  Cancel
-                </Button>
+          {isCategorySuggestionsOpen && filteredCategoryOptions.length ? (
+            <div className="max-h-40 overflow-auto rounded-md border border-border bg-background">
+              <div className="p-2">
+                {filteredCategoryOptions.map((category) => (
+                  <button
+                    key={category}
+                    type="button"
+                    className={
+                      "w-full rounded-md px-2 py-2 text-left text-sm hover:bg-muted " +
+                      (highlightedCategoryOption === category ? "bg-muted" : "")
+                    }
+                    onMouseEnter={() => onHighlightCategory(category)}
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      onSelectCategory(category)
+                      onSetCategorySuggestionsOpen(false)
+                    }}
+                  >
+                    {category}
+                  </button>
+                ))}
               </div>
             </div>
-          </div>
+          ) : null}
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <Label
+            htmlFor="create-ingredient-unit"
+            className="text-xs text-muted-foreground"
+          >
+            Default unit (optional)
+          </Label>
+          <Input
+            id="create-ingredient-unit"
+            value={newIngredientUnit}
+            onChange={(e) => onUnitChange(e.target.value)}
+            placeholder="e.g. tbsp"
+            autoComplete="off"
+          />
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Button
+            type="button"
+            disabled={isCreatingIngredient || !newIngredientName.trim()}
+            onClick={onSubmit}
+          >
+            {isCreatingIngredient ? "Creating…" : "Create"}
+          </Button>
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
         </div>
       </div>
-    </>
+    </BottomDockedSheet>
   )
 }

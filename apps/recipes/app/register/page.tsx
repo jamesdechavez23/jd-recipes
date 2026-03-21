@@ -1,10 +1,26 @@
 import RegisterForm from "./(ui)/RegisterForm"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "@repo/ui/shadcn/card"
 
 export default function RegisterPage() {
   return (
-    <div className="max-w-md mx-auto py-10 flex flex-col gap-6">
-      <h1 className="text-3xl font-bold">Register</h1>
-      <RegisterForm />
+    <div className="mx-auto flex w-full max-w-md py-10">
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Register</CardTitle>
+          <CardDescription>
+            Create an account to save recipes and manage your cooking workflow.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RegisterForm />
+        </CardContent>
+      </Card>
     </div>
   )
 }

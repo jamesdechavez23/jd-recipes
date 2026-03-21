@@ -690,11 +690,11 @@ export default function RecipeSectionsToggle({
         )}
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 border-t bg-background">
-        <div className="mx-auto flex max-w-3xl gap-3 p-4">
+      <div className="fixed inset-x-0 bottom-0 border-t border-border/45 bg-background/92 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-3xl flex-wrap gap-3 p-4 md:flex-nowrap">
           <Button
             type="button"
-            className="flex-1"
+            className="min-w-0 flex-1 basis-[calc(50%-0.375rem)] md:basis-0"
             variant={tab === "instructions" ? "default" : "secondary"}
             onClick={() => setTabAndNotify("instructions")}
           >
@@ -702,13 +702,17 @@ export default function RecipeSectionsToggle({
           </Button>
           <Button
             type="button"
-            className="flex-1"
+            className="min-w-0 flex-1 basis-[calc(50%-0.375rem)] md:basis-0"
             variant={tab === "ingredients" ? "default" : "secondary"}
             onClick={() => setTabAndNotify("ingredients")}
           >
             {ingredientsTabLabel ?? "Ingredients"}
           </Button>
-          {footerExtra ? <div className="shrink-0">{footerExtra}</div> : null}
+          {footerExtra ? (
+            <div className="flex w-full flex-wrap gap-2 md:w-auto md:shrink-0 md:flex-nowrap">
+              {footerExtra}
+            </div>
+          ) : null}
         </div>
       </div>
     </>
