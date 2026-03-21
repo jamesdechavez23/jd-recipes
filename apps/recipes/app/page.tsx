@@ -5,7 +5,7 @@ export default function Page() {
   return (
     <main>
       <div className="flex flex-col items-center justify-center gap-4">
-        <h1>Welcome to JD-Recipes TEST AGAIN 2</h1>
+        <h1>Welcome to JD-Recipes</h1>
         <Button asChild>
           <Link href="/register">Register</Link>
         </Button>
