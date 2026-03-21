@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { useActionState, useState } from "react"
+import { MoreHorizontal } from "lucide-react"
 
 import { Alert, AlertDescription } from "@repo/ui/shadcn/alert"
 import { Button } from "@repo/ui/shadcn/button"
@@ -38,6 +39,7 @@ export default function RecipeDetailActions({
 }: RecipeDetailActionsProps) {
   const [shoppingListState, setShoppingListState] =
     useState<AddRecipeIngredientsToShoppingListActionState>({ status: "idle" })
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [deleteState, formAction, isPending] = useActionState(
     deleteRecipeAction,
     { status: "idle" }
@@ -51,7 +53,7 @@ export default function RecipeDetailActions({
         </Alert>
       ) : null}
 
-      <div className="flex flex-wrap gap-2">
+      <div className="hidden flex-wrap gap-2 md:flex">
         <Button asChild>
           <Link href={editHref}>Edit recipe</Link>
         </Button>
@@ -84,6 +86,92 @@ export default function RecipeDetailActions({
             {isPending ? "Deleting…" : "Delete recipe"}
           </Button>
         </form>
+      </div>
+
+      <div className="md:hidden">
+        <div className="w-full">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full justify-between"
+            aria-haspopup="menu"
+            aria-expanded={mobileMenuOpen}
+            onClick={() => setMobileMenuOpen((open) => !open)}
+          >
+            <span className="flex items-center gap-2">
+              <MoreHorizontal className="h-4 w-4" />
+              Actions
+            </span>
+          </Button>
+
+          {mobileMenuOpen ? (
+            <div className="mt-2 flex w-full flex-col rounded-lg border border-border bg-background p-2 shadow-lg">
+              <Button
+                asChild
+                variant="ghost"
+                className="justify-start"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <Link href={editHref}>Edit recipe</Link>
+              </Button>
+
+              <Button
+                asChild
+                variant="ghost"
+                className="justify-start"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <Link href={cookHref}>I cooked this</Link>
+              </Button>
+
+              <AddRecipeIngredientsDialog
+                recipeName={recipeName}
+                shoppingListHref={shoppingListHref}
+                ingredients={recipeIngredients}
+                onActionStateChange={setShoppingListState}
+                addToShoppingListAction={addToShoppingListAction}
+                renderTrigger={({ openDialog }) => (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="justify-start"
+                    onClick={() => {
+                      setMobileMenuOpen(false)
+                      openDialog()
+                    }}
+                  >
+                    Add to shopping list
+                  </Button>
+                )}
+              />
+
+              <form
+                action={formAction}
+                onSubmit={(event) => {
+                  if (
+                    !window.confirm(
+                      "Delete this recipe? This also removes all linked steps and ingredients."
+                    )
+                  ) {
+                    event.preventDefault()
+                    return
+                  }
+
+                  setMobileMenuOpen(false)
+                }}
+              >
+                <Button
+                  type="submit"
+                  variant="ghost"
+                  className="w-full justify-start text-destructive hover:text-destructive"
+                  disabled={isPending}
+                >
+                  {isPending ? "Deleting…" : "Delete recipe"}
+                </Button>
+              </form>
+            </div>
+          ) : null}
+        </div>
       </div>
 
       {shoppingListState.status === "success" ? (

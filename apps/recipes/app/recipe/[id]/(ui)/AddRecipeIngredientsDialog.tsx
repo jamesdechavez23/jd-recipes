@@ -32,6 +32,7 @@ type AddRecipeIngredientsDialogProps = {
   onActionStateChange?: (
     state: AddRecipeIngredientsToShoppingListActionState
   ) => void
+  renderTrigger?: (controls: { openDialog: () => void }) => React.ReactNode
   addToShoppingListAction: (
     prevState: AddRecipeIngredientsToShoppingListActionState,
     formData: FormData
@@ -64,6 +65,7 @@ export default function AddRecipeIngredientsDialog({
   shoppingListHref,
   ingredients,
   onActionStateChange,
+  renderTrigger,
   addToShoppingListAction
 }: AddRecipeIngredientsDialogProps) {
   const [isOpen, setIsOpen] = useState(false)
@@ -159,18 +161,20 @@ export default function AddRecipeIngredientsDialog({
     })
   }
 
+  function openDialog() {
+    resetDrafts()
+    setIsOpen(true)
+  }
+
   return (
     <>
-      <Button
-        type="button"
-        variant="outline"
-        onClick={() => {
-          resetDrafts()
-          setIsOpen(true)
-        }}
-      >
-        Add ingredients to shopping list
-      </Button>
+      {renderTrigger ? (
+        renderTrigger({ openDialog })
+      ) : (
+        <Button type="button" variant="outline" onClick={openDialog}>
+          Add ingredients to shopping list
+        </Button>
+      )}
 
       {isOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8">

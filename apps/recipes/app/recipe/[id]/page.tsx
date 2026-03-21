@@ -60,7 +60,9 @@ export default async function RecipePage({ params }: RecipePageProps) {
             <div className="flex flex-col gap-1">
               <h1 className="text-2xl font-bold">{recipe.name}</h1>
               {recipe.description ? (
-                <p className="text-muted-foreground">{recipe.description}</p>
+                <p className="text-muted-foreground md:line-clamp-none line-clamp-3">
+                  {recipe.description}
+                </p>
               ) : null}
             </div>
 
@@ -98,7 +100,9 @@ export default async function RecipePage({ params }: RecipePageProps) {
           <div className="flex flex-col gap-1">
             <h1 className="text-2xl font-bold">{recipe.name}</h1>
             {recipe.description ? (
-              <p className="text-muted-foreground">{recipe.description}</p>
+              <p className="text-muted-foreground md:line-clamp-none line-clamp-3">
+                {recipe.description}
+              </p>
             ) : null}
           </div>
 
