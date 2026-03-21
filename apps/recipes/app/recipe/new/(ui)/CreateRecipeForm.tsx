@@ -22,7 +22,8 @@ import RecipeSectionsToggle, {
 } from "../../[id]/(ui)/RecipeSectionsToggle"
 import type {
   BuilderIngredient,
-  BuilderInstruction
+  BuilderInstruction,
+  RecipeEditorInitialData
 } from "./create-recipe-form/types"
 import {
   getNextInstructionId,
@@ -32,8 +33,10 @@ import {
   toYoutubeEmbedUrl
 } from "./create-recipe-form/utils"
 import type { IngredientListItem } from "@recipes/server/ingredients/getIngredients"
-import type { CreateRecipeActionState } from "../(actions)/createRecipeAction"
-import type { CreateIngredientActionState } from "../(actions)/createIngredientAction"
+import type {
+  CreateIngredientActionState,
+  RecipeEditorActionState
+} from "./create-recipe-form/actionTypes"
 import VideoEditorSheet from "./create-recipe-form/VideoEditorSheet"
 
 declare global {
@@ -46,10 +49,10 @@ declare global {
 }
 
 interface CreateRecipeFormProps {
-  createRecipeAction: (
-    prevState: CreateRecipeActionState,
+  recipeAction: (
+    prevState: RecipeEditorActionState,
     formData: FormData
-  ) => Promise<CreateRecipeActionState>
+  ) => Promise<RecipeEditorActionState>
   createIngredientAction: (
     prevState: CreateIngredientActionState,
     formData: FormData
@@ -57,20 +60,40 @@ interface CreateRecipeFormProps {
   canCreateIngredients: boolean
   ingredients: IngredientListItem[]
   ingredientsError: string | null
+  initialRecipe?: RecipeEditorInitialData
+  mode?: "create" | "edit"
+  draftStorageKey?: string | null
 }
 
-const LOCAL_STORAGE_KEY = "jd-recipes-create-recipe-form-v1"
+const DEFAULT_DRAFT_STORAGE_KEY = "jd-recipes-create-recipe-form-v1"
+
+const EMPTY_RECIPE: RecipeEditorInitialData = {
+  name: "",
+  description: "",
+  videoUrl: "",
+  instructions: [],
+  ingredients: []
+}
 
 export default function CreateRecipeForm({
-  createRecipeAction,
+  recipeAction,
   createIngredientAction,
   canCreateIngredients,
   ingredients,
-  ingredientsError
+  ingredientsError,
+  initialRecipe = EMPTY_RECIPE,
+  mode = "create",
+  draftStorageKey = DEFAULT_DRAFT_STORAGE_KEY
 }: CreateRecipeFormProps) {
   const formRef = useRef<HTMLFormElement | null>(null)
   const router = useRouter()
   const lastAutoDescriptionVideoUrlRef = useRef<string | null>(null)
+  const isCreateMode = mode === "create"
+  const resetButtonLabel = isCreateMode ? "Start over" : "Reset changes"
+  const submitButtonLabel = isCreateMode
+    ? "Create recipe (Ctrl+Enter)"
+    : "Save changes (Ctrl+Enter)"
+  const pendingSubmitButtonLabel = isCreateMode ? "Creating…" : "Saving…"
 
   const youtubeIframeRef = useRef<HTMLIFrameElement | null>(null)
   const ingredientPickerInputRef = useRef<HTMLInputElement | null>(null)
@@ -82,10 +105,9 @@ export default function CreateRecipeForm({
   const youtubeLastKnownStateRef = useRef<number | null>(null)
   const youtubeWasPlayingBeforeSheetRef = useRef<boolean>(false)
   const youtubeApiReadyPromiseRef = useRef<Promise<void> | null>(null)
-  const [actionState, formAction, isPending] = useActionState(
-    createRecipeAction,
-    { status: "idle" }
-  )
+  const [actionState, formAction, isPending] = useActionState(recipeAction, {
+    status: "idle"
+  })
 
   const [
     createIngredientState,
@@ -96,20 +118,41 @@ export default function CreateRecipeForm({
   const [availableIngredients, setAvailableIngredients] =
     useState<IngredientListItem[]>(ingredients)
 
-  const [name, setName] = useState<string>("")
-  const [description, setDescription] = useState<string>("")
-  const [videoUrl, setVideoUrl] = useState<string>("")
+  const [name, setName] = useState<string>(initialRecipe.name)
+  const [description, setDescription] = useState<string>(
+    initialRecipe.description
+  )
+  const [videoUrl, setVideoUrl] = useState<string>(initialRecipe.videoUrl)
   const [activeTab, setActiveTab] = useState<TabKey>("instructions")
-  const [instructions, setInstructions] = useState<BuilderInstruction[]>([])
+  const [instructions, setInstructions] = useState<BuilderInstruction[]>(() =>
+    renumberInstructions(initialRecipe.instructions)
+  )
   const [builderIngredients, setBuilderIngredients] = useState<
     BuilderIngredient[]
-  >([])
+  >(initialRecipe.ingredients)
+
+  function clearDraftStorage() {
+    if (!draftStorageKey || typeof window === "undefined") return
+    try {
+      window.localStorage.removeItem(draftStorageKey)
+    } catch {}
+  }
+
+  function restoreInitialRecipe() {
+    setName(initialRecipe.name)
+    setDescription(initialRecipe.description)
+    setVideoUrl(initialRecipe.videoUrl)
+    setActiveTab("instructions")
+    setInstructions(renumberInstructions(initialRecipe.instructions))
+    setBuilderIngredients(initialRecipe.ingredients)
+    setNextInstructionId(getNextInstructionId(initialRecipe.instructions))
+  }
 
   // Restore from localStorage on mount
   useEffect(() => {
-    if (typeof window === "undefined") return
+    if (!draftStorageKey || typeof window === "undefined") return
     try {
-      const raw = window.localStorage.getItem(LOCAL_STORAGE_KEY)
+      const raw = window.localStorage.getItem(draftStorageKey)
       if (!raw) return
       const data = JSON.parse(raw)
       if (typeof data !== "object" || !data) return
@@ -125,11 +168,11 @@ export default function CreateRecipeForm({
       if (Array.isArray(data.builderIngredients))
         setBuilderIngredients(data.builderIngredients)
     } catch {}
-  }, [])
+  }, [draftStorageKey])
 
   // Save to localStorage on change
   useEffect(() => {
-    if (typeof window === "undefined") return
+    if (!draftStorageKey || typeof window === "undefined") return
     const data = {
       name,
       description,
@@ -139,11 +182,21 @@ export default function CreateRecipeForm({
       builderIngredients
     }
     try {
-      window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data))
+      window.localStorage.setItem(draftStorageKey, JSON.stringify(data))
     } catch {}
-  }, [name, description, videoUrl, activeTab, instructions, builderIngredients])
+  }, [
+    activeTab,
+    builderIngredients,
+    description,
+    draftStorageKey,
+    instructions,
+    name,
+    videoUrl
+  ])
 
-  const [nextInstructionId, setNextInstructionId] = useState<number>(1)
+  const [nextInstructionId, setNextInstructionId] = useState<number>(() =>
+    getNextInstructionId(initialRecipe.instructions)
+  )
 
   const [isVideoEditorOpen, setIsVideoEditorOpen] = useState<boolean>(false)
   const [videoDraftUrl, setVideoDraftUrl] = useState<string>("")
@@ -373,12 +426,7 @@ export default function CreateRecipeForm({
 
   useEffect(() => {
     if (actionState.status !== "success") return
-    // Clear localStorage on success
-    if (typeof window !== "undefined") {
-      try {
-        window.localStorage.removeItem(LOCAL_STORAGE_KEY)
-      } catch {}
-    }
+    clearDraftStorage()
     const recipeId = tryGetRecipeId(actionState.recipe)
     if (!recipeId) return
     router.push(`/recipe/${recipeId}`)
@@ -1292,13 +1340,7 @@ export default function CreateRecipeForm({
   }
 
   function resetForm() {
-    setName("")
-    setDescription("")
-    setVideoUrl("")
-    setActiveTab("instructions")
-    setInstructions([])
-    setBuilderIngredients([])
-    setNextInstructionId(1)
+    restoreInitialRecipe()
     setVideoDraftUrl("")
     setIsVideoEditorOpen(false)
     setIsAddInstructionOpen(false)
@@ -1324,11 +1366,7 @@ export default function CreateRecipeForm({
     setIngredientPickerQuery("")
     setIsIngredientPickerOpen(false)
     setShowConfirmReset(false)
-    if (typeof window !== "undefined") {
-      try {
-        window.localStorage.removeItem(LOCAL_STORAGE_KEY)
-      } catch {}
-    }
+    clearDraftStorage()
   }
 
   const recipeHeaderFields = (
@@ -1343,7 +1381,7 @@ export default function CreateRecipeForm({
         value={name}
         onChange={(e) => setName(e.target.value)}
         className="w-full bg-transparent text-2xl font-bold text-foreground outline-none placeholder:text-muted-foreground"
-        placeholder="New recipe name"
+        placeholder={isCreateMode ? "New recipe name" : "Recipe name"}
         autoComplete="off"
       />
 
@@ -1426,11 +1464,15 @@ export default function CreateRecipeForm({
         <div className="flex w-full flex-wrap gap-2 md:w-auto md:flex-nowrap">
           <Button
             type="button"
-            variant="destructive"
-            className="flex-1 bg-destructive text-destructive-foreground hover:bg-destructive/85 md:flex-none"
+            variant={isCreateMode ? "destructive" : "outline"}
+            className={
+              isCreateMode
+                ? "flex-1 bg-destructive text-destructive-foreground hover:bg-destructive/85 md:flex-none"
+                : "flex-1 md:flex-none"
+            }
             onClick={() => setShowConfirmReset(true)}
           >
-            Start over
+            {resetButtonLabel}
           </Button>
           <Button
             type="submit"
@@ -1438,7 +1480,7 @@ export default function CreateRecipeForm({
             className="flex-1 md:flex-none"
             disabled={isPending}
           >
-            {isPending ? "Creating…" : "Create recipe (Ctrl+Enter)"}
+            {isPending ? pendingSubmitButtonLabel : submitButtonLabel}
           </Button>
         </div>
       }

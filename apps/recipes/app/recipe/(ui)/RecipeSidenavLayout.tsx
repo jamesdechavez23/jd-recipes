@@ -7,6 +7,7 @@ import { Menu, X } from "lucide-react"
 import { Button } from "@repo/ui/shadcn/button"
 import { Input } from "@repo/ui/shadcn/input"
 
+import { EXPANDABLE_FRAME_EXPANDED_EVENT } from "../../(ui)/ExpandableVideoFrame"
 import type { MyRecipeListItem } from "@recipes/server/recipes/getMyRecipes"
 
 export default function RecipeSidenavLayout({
@@ -42,6 +43,27 @@ export default function RecipeSidenavLayout({
       window.removeEventListener("keydown", onKeyDown)
     }
   }, [mobileMenuOpen])
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const collapseForExpandedFrame = () => {
+      setCollapsed(true)
+      setMobileMenuOpen(false)
+    }
+
+    window.addEventListener(
+      EXPANDABLE_FRAME_EXPANDED_EVENT,
+      collapseForExpandedFrame
+    )
+
+    return () => {
+      window.removeEventListener(
+        EXPANDABLE_FRAME_EXPANDED_EVENT,
+        collapseForExpandedFrame
+      )
+    }
+  }, [])
 
   React.useEffect(() => {
     if (typeof window === "undefined") return
@@ -115,6 +137,12 @@ export default function RecipeSidenavLayout({
         <Button asChild>
           <Link href="/recipe/new" onClick={handleNav}>
             New Recipe
+          </Link>
+        </Button>
+
+        <Button asChild variant="outline">
+          <Link href="/recipe/shopping-list" onClick={handleNav}>
+            Shopping List
           </Link>
         </Button>
       </div>

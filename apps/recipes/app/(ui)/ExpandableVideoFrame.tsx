@@ -3,6 +3,9 @@
 import { useEffect, useId, useState, type ReactNode } from "react"
 import { Button } from "@repo/ui/shadcn/button"
 
+export const EXPANDABLE_FRAME_EXPANDED_EVENT =
+  "jd-recipes:expandable-frame-expanded"
+
 type ExpandableVideoFrameProps = {
   children: ReactNode
   reserveViewportHeight?: string
@@ -20,6 +23,10 @@ export default function ExpandableVideoFrame({
   const [canExpand, setCanExpand] = useState(false)
   const titleId = useId()
 
+  function toggleExpanded() {
+    setIsExpanded((value) => !value)
+  }
+
   useEffect(() => {
     if (typeof window === "undefined") return
 
@@ -36,6 +43,12 @@ export default function ExpandableVideoFrame({
 
     return () => mediaQuery.removeEventListener("change", syncCanExpand)
   }, [])
+
+  useEffect(() => {
+    if (!isExpanded || !canExpand || typeof window === "undefined") return
+
+    window.dispatchEvent(new CustomEvent(EXPANDABLE_FRAME_EXPANDED_EVENT))
+  }, [canExpand, isExpanded])
 
   return (
     <div
@@ -63,7 +76,7 @@ export default function ExpandableVideoFrame({
             aria-expanded={isExpanded}
             aria-controls={titleId}
             aria-hidden={!canExpand}
-            onClick={() => setIsExpanded((value) => !value)}
+            onClick={toggleExpanded}
           >
             {isExpanded ? collapseLabel : expandLabel}
           </Button>

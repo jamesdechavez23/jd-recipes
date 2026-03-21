@@ -7,19 +7,7 @@ import {
   requireAdminAccessToken
 } from "@recipes/utils/requireAdmin"
 import { createIngredient } from "@recipes/server/ingredients/createIngredient"
-
-export type CreateIngredientActionState =
-  | { status: "idle" }
-  | {
-      status: "success"
-      ingredient: {
-        id: number
-        name: string
-        category?: string | null
-        unit?: string | null
-      }
-    }
-  | { status: "error"; message: string; httpStatus?: number }
+import type { CreateIngredientActionState } from "../(ui)/create-recipe-form/actionTypes"
 
 function asTrimmedString(value: FormDataEntryValue | null): string {
   if (typeof value !== "string") return ""

@@ -2,7 +2,7 @@ import { Alert, AlertDescription } from "@repo/ui/shadcn/alert"
 import { Button } from "@repo/ui/shadcn/button"
 import { Input } from "@repo/ui/shadcn/input"
 import { Label } from "@repo/ui/shadcn/label"
-import type { CreateIngredientActionState } from "../../(actions)/createIngredientAction"
+import type { CreateIngredientActionState } from "./actionTypes"
 import BottomDockedSheet from "./BottomDockedSheet"
 
 interface CreateIngredientSheetProps {

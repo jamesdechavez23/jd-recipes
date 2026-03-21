@@ -19,6 +19,14 @@ export type BuilderIngredient = DisplayIngredient & {
   quantityDisplay?: string | null
 }
 
+export type RecipeEditorInitialData = {
+  name: string
+  description: string
+  videoUrl: string
+  instructions: BuilderInstruction[]
+  ingredients: BuilderIngredient[]
+}
+
 export type InstructionDraftStepIngredient = {
   ingredientId: number
   quantity: string
