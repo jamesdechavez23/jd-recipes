@@ -88,7 +88,7 @@ export default async function EditRecipePage({ params }: EditRecipePageProps) {
   const recipe = await getRecipeById({ id: recipeId })
 
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
+    <main className="mx-auto flex max-w-3xl xl:max-w-350 flex-col gap-6 px-4 md:p-8 pb-20">
       <CreateRecipeForm
         mode="edit"
         initialRecipe={toInitialRecipeData(recipe)}

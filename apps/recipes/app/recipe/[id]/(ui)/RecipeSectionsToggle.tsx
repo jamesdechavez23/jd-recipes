@@ -1,5 +1,6 @@
 "use client"
 
+import React from "react"
 import {
   DndContext,
   KeyboardSensor,
@@ -421,6 +422,7 @@ export default function RecipeSectionsToggle({
   const [overInstructionId, setOverInstructionId] = useState<string | null>(
     null
   )
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 8 }
@@ -524,7 +526,7 @@ export default function RecipeSectionsToggle({
 
   return (
     <>
-      <div className="flex flex-col gap-6 pb-24">
+      <div className="flex flex-col gap-6">
         {tab === "ingredients" ? (
           <section className="flex flex-col gap-2">
             <div className="flex items-center justify-between gap-3">
@@ -708,11 +710,7 @@ export default function RecipeSectionsToggle({
           >
             {ingredientsTabLabel ?? "Ingredients"}
           </Button>
-          {footerExtra ? (
-            <div className="flex w-full flex-wrap gap-2 md:w-auto md:shrink-0 md:flex-nowrap">
-              {footerExtra}
-            </div>
-          ) : null}
+          {footerExtra ? <>{footerExtra}</> : null}
         </div>
       </div>
     </>

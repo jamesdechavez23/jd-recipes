@@ -7,10 +7,7 @@ import { Menu, X } from "lucide-react"
 import { Button } from "@repo/ui/shadcn/button"
 import { Input } from "@repo/ui/shadcn/input"
 
-import {
-  EXPANDABLE_FRAME_EXPANDED_EVENT,
-  EXPANDABLE_FRAME_SIDENAV_EXPANDED_EVENT
-} from "../../(ui)/ExpandableVideoFrame"
+// Expandable frame events removed; no-op
 import type { MyRecipeListItem } from "@recipes/server/recipes/getMyRecipes"
 
 export default function RecipeSidenavLayout({
@@ -47,26 +44,8 @@ export default function RecipeSidenavLayout({
     }
   }, [mobileMenuOpen])
 
-  React.useEffect(() => {
-    if (typeof window === "undefined") return
-
-    const collapseForExpandedFrame = () => {
-      setCollapsed(true)
-      setMobileMenuOpen(false)
-    }
-
-    window.addEventListener(
-      EXPANDABLE_FRAME_EXPANDED_EVENT,
-      collapseForExpandedFrame
-    )
-
-    return () => {
-      window.removeEventListener(
-        EXPANDABLE_FRAME_EXPANDED_EVENT,
-        collapseForExpandedFrame
-      )
-    }
-  }, [])
+  // Previously listened for expandable-frame expansion to collapse the sidenav.
+  // Expand/collapse functionality removed, so no listener is needed.
 
   React.useEffect(() => {
     if (typeof window === "undefined") return
@@ -219,21 +198,7 @@ export default function RecipeSidenavLayout({
             type="button"
             variant="outline"
             size={collapsed ? "icon" : "sm"}
-            onClick={() =>
-              setCollapsed((value) => {
-                const next = !value
-                // if we're expanding the sidenav, inform any expanded frames so they can collapse
-                // dispatch asynchronously to avoid calling setState in other components during render
-                if (!next && typeof window !== "undefined") {
-                  setTimeout(() => {
-                    window.dispatchEvent(
-                      new CustomEvent(EXPANDABLE_FRAME_SIDENAV_EXPANDED_EVENT)
-                    )
-                  }, 0)
-                }
-                return next
-              })
-            }
+            onClick={() => setCollapsed((value) => !value)}
             aria-label={collapsed ? "Expand sidenav" : "Collapse sidenav"}
           >
             {collapsed ? ">" : "<"}
@@ -244,7 +209,7 @@ export default function RecipeSidenavLayout({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="sticky top-0 z-30 flex items-center justify-between border-b border-border/45 bg-background/90 px-4 py-3 backdrop-blur md:hidden">
+        <div className="sticky top-0 z-30 flex items-center justify-between px-4 py-3 backdrop-blur md:hidden">
           <Button
             type="button"
             variant="outline"
@@ -255,14 +220,6 @@ export default function RecipeSidenavLayout({
             aria-controls="recipe-mobile-drawer"
           >
             <Menu className="h-4 w-4" />
-          </Button>
-
-          <p className="text-sm font-semibold">Recipes</p>
-
-          <Button asChild size="sm">
-            <Link href="/recipe/new" onClick={handleNav}>
-              New Recipe
-            </Link>
           </Button>
         </div>
 

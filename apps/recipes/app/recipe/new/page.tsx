@@ -29,7 +29,7 @@ export default async function CreateRecipePage() {
   }
 
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
+    <main className="mx-auto flex max-w-3xl xl:max-w-350 flex-col gap-6 px-4 md:p-8 pb-20">
       <CreateRecipeForm
         recipeAction={createRecipeAction}
         createIngredientAction={createIngredientAction}

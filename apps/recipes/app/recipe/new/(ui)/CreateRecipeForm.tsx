@@ -90,9 +90,7 @@ export default function CreateRecipeForm({
   const lastAutoDescriptionVideoUrlRef = useRef<string | null>(null)
   const isCreateMode = mode === "create"
   const resetButtonLabel = isCreateMode ? "Start over" : "Reset changes"
-  const submitButtonLabel = isCreateMode
-    ? "Create recipe (Ctrl+Enter)"
-    : "Save changes (Ctrl+Enter)"
+  const submitButtonLabel = isCreateMode ? "Create recipe" : "Save changes"
   const pendingSubmitButtonLabel = isCreateMode ? "Creating…" : "Saving…"
 
   const youtubeIframeRef = useRef<HTMLIFrameElement | null>(null)
@@ -1461,28 +1459,29 @@ export default function CreateRecipeForm({
         </Button>
       }
       footerExtra={
-        <div className="flex w-full flex-wrap gap-2 md:w-auto md:flex-nowrap">
+        <>
           <Button
             type="button"
             variant={isCreateMode ? "destructive" : "outline"}
             className={
               isCreateMode
-                ? "flex-1 bg-destructive text-destructive-foreground hover:bg-destructive/85 md:flex-none"
-                : "flex-1 md:flex-none"
+                ? "w-full bg-destructive text-destructive-foreground hover:bg-destructive/85 min-w-0 flex-1 basis-[calc(50%-0.375rem)] md:basis-0"
+                : "w-full min-w-0 flex-1 basis-[calc(50%-0.375rem)] md:basis-0"
             }
             onClick={() => setShowConfirmReset(true)}
           >
             {resetButtonLabel}
           </Button>
+
           <Button
             type="submit"
             variant="success"
-            className="flex-1 md:flex-none"
+            className="min-w-0 flex-1 basis-[calc(50%-0.375rem)] md:basis-0"
             disabled={isPending}
           >
             {isPending ? pendingSubmitButtonLabel : submitButtonLabel}
           </Button>
-        </div>
+        </>
       }
     />
   )
@@ -1520,13 +1519,11 @@ export default function CreateRecipeForm({
       <input type="hidden" name="instructionsJson" value={instructionsJson} />
 
       {videoEmbedUrl ? (
-        <ExpandableVideoFrame
-          reserveViewportHeight="34rem"
-          expandLabel="Expand section"
-          collapseLabel="Reset section size"
-        >
-          {expandedRecipeContent}
-        </ExpandableVideoFrame>
+        <div className="w-full">
+          <div className="mx-auto flex w-full flex-col gap-3 rounded transition-[max-width] duration-200 ease-out">
+            {expandedRecipeContent}
+          </div>
+        </div>
       ) : (
         <>
           {recipeHeaderFields}
