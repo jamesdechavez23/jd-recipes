@@ -14,6 +14,8 @@ import {
   type ShoppingListIngredientSelectionInput
 } from "@recipes/server/shopping-list/addRecipeIngredientsToShoppingList"
 import { RecipeOwnershipError } from "@recipes/server/recipes/ensureRecipeOwnership"
+import { getDbPool } from "@recipes/server/db/pool"
+import { isCognitoAdmin } from "@recipes/utils/cognitoJwt"
 
 import type { AddRecipeIngredientsToShoppingListActionState } from "../../shopping-list/(ui)/actionTypes"
 
@@ -88,6 +90,30 @@ export default async function addRecipeIngredientsToShoppingListAction(
   }
 
   try {
+    if (!isCognitoAdmin(currentUser.payload)) {
+      try {
+        const pool = await getDbPool()
+        const countResult = await pool.query<{ cnt: number }>(
+          "select count(*)::int as cnt from shopping_list_items sli join shopping_lists sl on sl.id = sli.shopping_list_id where sl.owner_sub = $1 and sli.is_checked = false",
+          [currentUser.sub]
+        )
+        const existing = Number(countResult.rows[0]?.cnt ?? 0)
+        if (existing + selectedIngredients.length > 20) {
+          return {
+            status: "error",
+            httpStatus: 400,
+            message: `Shopping list limit reached (20 items). You may add ${Math.max(
+              0,
+              20 - existing
+            )} more. Upgrade to add more.`
+          }
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        return { status: "error", message }
+      }
+    }
+
     const result = await addRecipeIngredientsToShoppingList({
       ownerSub: currentUser.sub,
       recipeId,

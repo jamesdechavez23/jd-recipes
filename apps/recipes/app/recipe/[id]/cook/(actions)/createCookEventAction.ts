@@ -14,6 +14,8 @@ import {
   CreateCookEventError
 } from "@recipes/server/cook-events/createCookEvent"
 import { RecipeOwnershipError } from "@recipes/server/recipes/ensureRecipeOwnership"
+import { getDbPool } from "@recipes/server/db/pool"
+import { isCognitoAdmin } from "@recipes/utils/cognitoJwt"
 
 import type { RecordCookEventActionState } from "../(ui)/actionTypes"
 
@@ -79,6 +81,23 @@ export default async function createCookEventAction(
   let cookEventId: number | null = null
 
   try {
+    if (!isCognitoAdmin(currentUser.payload)) {
+      const pool = await getDbPool()
+      const countResult = await pool.query<{ cnt: number }>(
+        "select count(*)::int as cnt from cook_events where recipe_id = $1 and owner_sub = $2",
+        [recipeId, currentUser.sub]
+      )
+      const existing = Number(countResult.rows[0]?.cnt ?? 0)
+      if (existing >= 1) {
+        return {
+          status: "error",
+          httpStatus: 400,
+          message:
+            "Only one cook event allowed per recipe. Upgrade to create more."
+        }
+      }
+    }
+
     const cookEvent = await createCookEvent({
       recipeId,
       ownerSub: currentUser.sub,
