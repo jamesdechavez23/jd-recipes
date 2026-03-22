@@ -12,6 +12,7 @@ import confirmCognitoUserAction from "../(actions)/confirmCognitoUserAction"
 import registerCognitoUserAction, {
   type RegisterState
 } from "../(actions)/registerCognitoUserAction"
+import TurnstileWidget from "@recipes/app/(components)/TurnstileWidget"
 
 export default function RegisterForm() {
   const [registerState, registerAction, registerPending] = useActionState(
@@ -73,6 +74,8 @@ export default function RegisterForm() {
               required
             />
           </div>
+
+          <TurnstileWidget />
 
           <Button type="submit" disabled={registerPending} className="w-full">
             {registerPending ? "Creating account…" : "Create account"}

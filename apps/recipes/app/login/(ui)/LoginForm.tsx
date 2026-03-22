@@ -11,6 +11,7 @@ import { Label } from "@repo/ui/shadcn/label"
 import loginCognitoUserAction, {
   type LoginState
 } from "../(actions)/loginCognitoUserAction"
+import TurnstileWidget from "@recipes/app/(components)/TurnstileWidget"
 
 export default function LoginForm({ redirectTo }: { redirectTo: string }) {
   const [state, action, pending] = useActionState(loginCognitoUserAction, {
@@ -49,6 +50,8 @@ export default function LoginForm({ redirectTo }: { redirectTo: string }) {
             required
           />
         </div>
+
+        <TurnstileWidget />
 
         <Button type="submit" disabled={pending} className="w-full">
           {pending ? "Signing in…" : "Sign in"}

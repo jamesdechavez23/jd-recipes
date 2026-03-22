@@ -11,7 +11,6 @@ import {
 import { useRouter } from "next/navigation"
 import { Alert, AlertDescription } from "@repo/ui/shadcn/alert"
 import { Button } from "@repo/ui/shadcn/button"
-import ExpandableVideoFrame from "../../../(ui)/ExpandableVideoFrame"
 import ConfirmResetDialog from "./create-recipe-form/ConfirmResetDialog"
 import CreateIngredientSheet from "./create-recipe-form/CreateIngredientSheet"
 import IngredientEditorSheet from "./create-recipe-form/IngredientEditorSheet"

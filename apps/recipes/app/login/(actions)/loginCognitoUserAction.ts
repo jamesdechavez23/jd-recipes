@@ -12,6 +12,7 @@ import {
   getCognitoClientId,
   getCognitoSecretHash
 } from "@recipes/utils/cognito"
+import { verifyTurnstileToken } from "@recipes/server/turnstile/verifyTurnstile"
 import {
   ACCESS_TOKEN_COOKIE_NAME,
   DEFAULT_REFRESH_TOKEN_MAX_AGE_SECONDS,
@@ -49,7 +50,20 @@ export default async function loginCognitoUserAction(
   if (!email) return { status: "error", message: "Email is required." }
   if (!password) return { status: "error", message: "Password is required." }
 
+  const turnstileToken = String(formData.get("turnstileToken") ?? "").trim()
+  if (!turnstileToken) {
+    return { status: "error", message: "Captcha verification is required." }
+  }
+
   try {
+    const headerStore = await headers()
+    const remoteIp = headerStore.get("x-forwarded-for") || undefined
+
+    const ok = await verifyTurnstileToken(turnstileToken, remoteIp)
+    if (!ok) {
+      return { status: "error", message: "Captcha verification failed." }
+    }
+
     const client = await getCognitoClient()
     const clientId = await getCognitoClientId()
     const secretHash = await getCognitoSecretHash(email)
@@ -87,7 +101,6 @@ export default async function loginCognitoUserAction(
     }
 
     const cookieStore = await cookies()
-    const headerStore = await headers()
     const forwardedProto = headerStore.get("x-forwarded-proto")
     const isSecure = forwardedProto === "https"
 

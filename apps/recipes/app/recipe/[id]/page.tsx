@@ -1,4 +1,3 @@
-import ExpandableVideoFrame from "../../(ui)/ExpandableVideoFrame"
 import addRecipeIngredientsToShoppingListAction from "./(actions)/addRecipeIngredientsToShoppingListAction"
 import deleteRecipeAction from "./(actions)/deleteRecipeAction"
 import { requireCurrentUser } from "@recipes/server/auth/requireCurrentUser"

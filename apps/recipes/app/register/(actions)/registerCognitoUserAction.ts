@@ -8,6 +8,7 @@ import {
   getCognitoClientId,
   getCognitoSecretHash
 } from "@recipes/utils/cognito"
+import { verifyTurnstileToken } from "@recipes/server/turnstile/verifyTurnstile"
 
 export type RegisterState =
   | { status: "idle" }
@@ -31,7 +32,17 @@ export default async function registerCognitoUserAction(
     return { status: "error", message: "Passwords do not match." }
   }
 
+  const turnstileToken = String(formData.get("turnstileToken") ?? "").trim()
+  if (!turnstileToken) {
+    return { status: "error", message: "Captcha verification is required." }
+  }
+
   try {
+    const ok = await verifyTurnstileToken(turnstileToken)
+    if (!ok) {
+      return { status: "error", message: "Captcha verification failed." }
+    }
+
     const client = await getCognitoClient()
     const clientId = await getCognitoClientId()
     const secretHash = await getCognitoSecretHash(email)
