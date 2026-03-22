@@ -15,34 +15,45 @@ export default function TurnstileWidget() {
 
   useEffect(() => {
     const siteKey = process.env.NEXT_PUBLIC_CF_TURNSTILE_SITE_KEY
+    console.log("Turnstile useEffect start, siteKey=", siteKey)
     if (!siteKey) return
 
     const renderWidget = () => {
       try {
         const el = widgetRef.current
+        console.log("renderWidget called, widgetRef=", el)
         if (!el) return
         // Prevent double-rendering (React strict-mode remounts)
+        console.log("turnstileRendered dataset:", el.dataset.turnstileRendered)
         if (el.dataset.turnstileRendered === "1") return
 
         if (window.turnstile) {
+          console.log("window.turnstile available, rendering widget")
           const widgetId = window.turnstile.render(el, {
             sitekey: siteKey,
             callback: (token: string) => {
               const input = document.getElementById(
                 inputId
               ) as HTMLInputElement | null
+              console.log(
+                "Turnstile callback token:",
+                token,
+                "inputElement:",
+                input
+              )
               if (input) input.value = token
             }
           })
           try {
             el.dataset.turnstileRendered = "1"
             if (widgetId) el.dataset.turnstileWidgetId = String(widgetId)
+            console.log("turnstile.render returned widgetId=", widgetId)
           } catch (e) {
-            // ignore dataset failures
+            console.error("Turnstile dataset write error:", e)
           }
         }
       } catch (e) {
-        // ignore
+        console.error("Turnstile render error:", e)
       }
     }
 
@@ -55,18 +66,27 @@ export default function TurnstileWidget() {
       'script[src*="challenges.cloudflare.com/turnstile"]'
     ) as HTMLScriptElement | null
     if (existing) {
+      console.log("Found existing Turnstile script, attaching load listener")
       existing.addEventListener("load", renderWidget)
-      return () => existing.removeEventListener("load", renderWidget)
+      return () => {
+        console.log("Removing existing Turnstile script load listener")
+        existing.removeEventListener("load", renderWidget)
+      }
     }
 
     const script = document.createElement("script")
     script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js"
     script.async = true
     script.defer = true
-    script.addEventListener("load", renderWidget)
+    console.log("Appending Turnstile script and waiting for load")
+    script.addEventListener("load", () => {
+      console.log("Turnstile script loaded")
+      renderWidget()
+    })
     document.body.appendChild(script)
 
     return () => {
+      console.log("Removing Turnstile script load listener / cleanup")
       script.removeEventListener("load", renderWidget)
     }
   }, [inputId])
