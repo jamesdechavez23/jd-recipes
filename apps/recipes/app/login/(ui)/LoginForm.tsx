@@ -51,7 +51,7 @@ export default function LoginForm({ redirectTo }: { redirectTo: string }) {
           />
         </div>
 
-        {/* <TurnstileWidget /> */}
+        <TurnstileWidget />
 
         <Button type="submit" disabled={pending} className="w-full">
           {pending ? "Signing in…" : "Sign in"}
