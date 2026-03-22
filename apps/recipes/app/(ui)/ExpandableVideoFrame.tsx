@@ -5,6 +5,8 @@ import { Button } from "@repo/ui/shadcn/button"
 
 export const EXPANDABLE_FRAME_EXPANDED_EVENT =
   "jd-recipes:expandable-frame-expanded"
+export const EXPANDABLE_FRAME_SIDENAV_EXPANDED_EVENT =
+  "jd-recipes:sidenav-expanded"
 
 type ExpandableVideoFrameProps = {
   children: ReactNode
@@ -49,6 +51,27 @@ export default function ExpandableVideoFrame({
 
     window.dispatchEvent(new CustomEvent(EXPANDABLE_FRAME_EXPANDED_EVENT))
   }, [canExpand, isExpanded])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const onSidenavExpanded = () => {
+      // If the sidenav expands while this frame is expanded, collapse the frame
+      setIsExpanded(false)
+    }
+
+    window.addEventListener(
+      EXPANDABLE_FRAME_SIDENAV_EXPANDED_EVENT,
+      onSidenavExpanded
+    )
+
+    return () => {
+      window.removeEventListener(
+        EXPANDABLE_FRAME_SIDENAV_EXPANDED_EVENT,
+        onSidenavExpanded
+      )
+    }
+  }, [])
 
   return (
     <div

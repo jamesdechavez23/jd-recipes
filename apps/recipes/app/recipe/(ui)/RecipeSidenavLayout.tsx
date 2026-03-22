@@ -7,7 +7,10 @@ import { Menu, X } from "lucide-react"
 import { Button } from "@repo/ui/shadcn/button"
 import { Input } from "@repo/ui/shadcn/input"
 
-import { EXPANDABLE_FRAME_EXPANDED_EVENT } from "../../(ui)/ExpandableVideoFrame"
+import {
+  EXPANDABLE_FRAME_EXPANDED_EVENT,
+  EXPANDABLE_FRAME_SIDENAV_EXPANDED_EVENT
+} from "../../(ui)/ExpandableVideoFrame"
 import type { MyRecipeListItem } from "@recipes/server/recipes/getMyRecipes"
 
 export default function RecipeSidenavLayout({
@@ -216,7 +219,21 @@ export default function RecipeSidenavLayout({
             type="button"
             variant="outline"
             size={collapsed ? "icon" : "sm"}
-            onClick={() => setCollapsed((value) => !value)}
+            onClick={() =>
+              setCollapsed((value) => {
+                const next = !value
+                // if we're expanding the sidenav, inform any expanded frames so they can collapse
+                // dispatch asynchronously to avoid calling setState in other components during render
+                if (!next && typeof window !== "undefined") {
+                  setTimeout(() => {
+                    window.dispatchEvent(
+                      new CustomEvent(EXPANDABLE_FRAME_SIDENAV_EXPANDED_EVENT)
+                    )
+                  }, 0)
+                }
+                return next
+              })
+            }
             aria-label={collapsed ? "Expand sidenav" : "Collapse sidenav"}
           >
             {collapsed ? ">" : "<"}

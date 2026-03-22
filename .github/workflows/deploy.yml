@@ -23,8 +23,10 @@ jobs:
           ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
             cd /srv/jd-recipes/jd-recipes
             git pull
+            rm -rf node_modules
             npm install
             rm -rf apps/recipes/.next
+            rm -rf packages/ui/dist
             npm run build
             sudo systemctl restart jd-recipes
           EOF
