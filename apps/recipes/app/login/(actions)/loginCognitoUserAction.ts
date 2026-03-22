@@ -50,19 +50,19 @@ export default async function loginCognitoUserAction(
   if (!email) return { status: "error", message: "Email is required." }
   if (!password) return { status: "error", message: "Password is required." }
 
-  const turnstileToken = String(formData.get("turnstileToken") ?? "").trim()
-  if (!turnstileToken) {
-    return { status: "error", message: "Captcha verification is required." }
-  }
+  // const turnstileToken = String(formData.get("turnstileToken") ?? "").trim()
+  // if (!turnstileToken) {
+  //   return { status: "error", message: "Captcha verification is required." }
+  // }
 
   try {
     const headerStore = await headers()
-    const remoteIp = headerStore.get("x-forwarded-for") || undefined
+    // const remoteIp = headerStore.get("x-forwarded-for") || undefined
 
-    const ok = await verifyTurnstileToken(turnstileToken, remoteIp)
-    if (!ok) {
-      return { status: "error", message: "Captcha verification failed." }
-    }
+    // const ok = await verifyTurnstileToken(turnstileToken, remoteIp)
+    // if (!ok) {
+    //   return { status: "error", message: "Captcha verification failed." }
+    // }
 
     const client = await getCognitoClient()
     const clientId = await getCognitoClientId()
