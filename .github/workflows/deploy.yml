@@ -24,6 +24,7 @@ jobs:
             cd /srv/jd-recipes/jd-recipes
             git pull
             npm install
+            rm -rf apps/recipes/.next
             npm run build
             sudo systemctl restart jd-recipes
           EOF
