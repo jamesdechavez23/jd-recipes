@@ -27,7 +27,10 @@ jobs:
             npm install
             rm -rf apps/recipes/.next
             rm -rf packages/ui/dist
-            set -o allexport; source /etc/jd-recipes.env || true; set +o allexport
-            npm run build
+            sudo cp /etc/jd-recipes.env /tmp/jd-recipes.env
+            sudo chown $(whoami):$(whoami) /tmp/jd-recipes.env
+            sudo chmod 600 /tmp/jd-recipes.env
+            sudo -u $(whoami) bash -lc 'set -o allexport; source /tmp/jd-recipes.env; set +o allexport; cd /srv/jd-recipes/jd-recipes && npm run build'
+            sudo rm -f /tmp/jd-recipes.env
             sudo systemctl restart jd-recipes
           EOF
