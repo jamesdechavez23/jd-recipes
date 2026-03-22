@@ -185,7 +185,13 @@ export default function AddRecipeIngredientsDialog({
           Add ingredients to shopping list
         </Button>
       )}
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent
+        className="sm:max-w-2xl"
+        style={{
+          paddingTop: "calc(env(safe-area-inset-top) + 1rem)",
+          paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)"
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Add ingredients</DialogTitle>
           <DialogDescription>
@@ -241,7 +247,13 @@ export default function AddRecipeIngredientsDialog({
               </Button>
             </div>
           </div>
-          <div className="max-h-[60vh] overflow-y-auto pr-1">
+          <div
+            className="max-h-[60vh] overflow-y-auto pr-1"
+            style={{
+              maxHeight:
+                "calc(60vh - env(safe-area-inset-top) - env(safe-area-inset-bottom))"
+            }}
+          >
             <div className="flex flex-col gap-3">
               {drafts.map((draft) => (
                 <div
@@ -314,7 +326,12 @@ export default function AddRecipeIngredientsDialog({
               ))}
             </div>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border px-6 py-5">
+          <div
+            className="flex flex-wrap items-center justify-end gap-2 border-t border-border px-6 py-5"
+            style={{
+              paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)"
+            }}
+          >
             <Button
               type="button"
               variant="secondary"
