@@ -64,7 +64,6 @@ export default function RecipeDetailActions({
 
         <AddRecipeIngredientsDialog
           recipeName={recipeName}
-          shoppingListHref={shoppingListHref}
           ingredients={recipeIngredients}
           onActionStateChange={setShoppingListState}
           addToShoppingListAction={addToShoppingListAction}
@@ -126,23 +125,9 @@ export default function RecipeDetailActions({
 
               <AddRecipeIngredientsDialog
                 recipeName={recipeName}
-                shoppingListHref={shoppingListHref}
                 ingredients={recipeIngredients}
                 onActionStateChange={setShoppingListState}
                 addToShoppingListAction={addToShoppingListAction}
-                renderTrigger={({ openDialog }) => (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="justify-start"
-                    onClick={() => {
-                      setMobileMenuOpen(false)
-                      openDialog()
-                    }}
-                  >
-                    Add to shopping list
-                  </Button>
-                )}
               />
 
               <form
