@@ -101,6 +101,8 @@ type KnightMoveAnimation = {
   key: number
 }
 
+type SquareStepLookup = Map<string, number[]>
+
 export default function SpeedKnightGame({
   initialState
 }: {
@@ -160,26 +162,14 @@ export default function SpeedKnightGame({
     )
   }, [isSandboxMode, sandboxScenario, showBestLine])
   const sandboxBestLineSteps = useMemo(() => {
-    const steps = new Map<string, number>()
-
-    sandboxBestLine.slice(1).forEach((position, index) => {
-      steps.set(getSquareId(position), index + 1)
-    })
-
-    return steps
+    return buildSquareStepLookup(sandboxBestLine)
   }, [sandboxBestLine])
   const sandboxYourLineSteps = useMemo(() => {
-    const steps = new Map<string, number>()
-
     if (!isSandboxMode || !showYourLine || !sandboxScenario) {
-      return steps
+      return new Map<string, number[]>()
     }
 
-    sandboxScenario.actualPath.slice(1).forEach((position, index) => {
-      steps.set(getSquareId(position), index + 1)
-    })
-
-    return steps
+    return buildSquareStepLookup(sandboxScenario.actualPath)
   }, [isSandboxMode, sandboxScenario, showYourLine])
   const sandboxRunScore = gameOverState?.score ?? 0
   const showMobileCompactHud = isGameActive || isSandboxMode
@@ -1062,8 +1052,8 @@ function Row({
   bishop: { row: number; col: number } | null
   rook: { row: number; col: number } | null
   legalMoves: Array<{ row: number; col: number }>
-  bestLineStepLookup: Map<string, number>
-  yourLineStepLookup: Map<string, number>
+  bestLineStepLookup: SquareStepLookup
+  yourLineStepLookup: SquareStepLookup
   isBoardInteractive: boolean
   showHints: boolean
   isClient: boolean
@@ -1112,8 +1102,8 @@ function Row({
                 ? String.fromCharCode(65 + columnIndex)
                 : undefined
             }
-            bestLineStep={bestLineStepLookup.get(getSquareId(position))}
-            yourLineStep={yourLineStepLookup.get(getSquareId(position))}
+            bestLineSteps={bestLineStepLookup.get(getSquareId(position))}
+            yourLineSteps={yourLineStepLookup.get(getSquareId(position))}
             isBoardInteractive={isBoardInteractive}
             showHints={showHints}
             isClient={isClient}
@@ -1138,8 +1128,8 @@ function Square({
   isEnemyAttackSquare,
   rowLabel,
   columnLabel,
-  bestLineStep,
-  yourLineStep,
+  bestLineSteps,
+  yourLineSteps,
   isBoardInteractive,
   showHints,
   isClient,
@@ -1157,8 +1147,8 @@ function Square({
   isEnemyAttackSquare: boolean
   rowLabel?: number
   columnLabel?: string
-  bestLineStep?: number
-  yourLineStep?: number
+  bestLineSteps?: number[]
+  yourLineSteps?: number[]
   isBoardInteractive: boolean
   showHints: boolean
   isClient: boolean
@@ -1167,6 +1157,12 @@ function Square({
   onMove: (destination: Position, inputMethod: "tap" | "drag") => void
 }) {
   const squareId = getSquareId(position)
+  const bestLineBadge = bestLineSteps
+    ? formatSquareStepBadge(bestLineSteps, "Best moves on this square")
+    : null
+  const yourLineBadge = yourLineSteps
+    ? formatSquareStepBadge(yourLineSteps, "Your moves on this square")
+    : null
   const { isOver, setNodeRef } = useDroppable({
     id: squareId,
     data: {
@@ -1211,7 +1207,9 @@ function Square({
         hasPawn,
         hasBishop,
         hasRook,
-        isLegalMove
+        isLegalMove,
+        bestLineSteps,
+        yourLineSteps
       })}
       className={cn(
         "group flex aspect-square items-center justify-center border p-0 text-sm font-semibold leading-none align-top shadow-sm transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 sm:text-base",
@@ -1270,7 +1268,7 @@ function Square({
           hasRook &&
           !hasKnight &&
           "border-[hsl(var(--board-capture)/0.5)] bg-[hsl(var(--board-capture)/0.14)] text-foreground shadow-[0_0_0_1px_hsl(var(--board-capture)/0.15)] dark:bg-[hsl(var(--board-capture)/0.22)] dark:shadow-[0_0_0_1px_hsl(var(--board-capture)/0.24)]",
-        bestLineStep !== undefined &&
+        bestLineBadge &&
           "border-[hsl(var(--board-best)/0.7)] bg-[hsl(var(--board-best)/0.12)] shadow-[0_0_0_1px_hsl(var(--board-best)/0.24)] dark:bg-[hsl(var(--board-best)/0.18)] dark:shadow-[0_0_0_1px_hsl(var(--board-best)/0.32)]"
       )}
     >
@@ -1375,14 +1373,20 @@ function Square({
             {columnLabel}
           </span>
         ) : null}
-        {bestLineStep !== undefined ? (
-          <span className="pointer-events-none absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-[hsl(var(--board-best))] text-[0.65rem] font-bold text-primary-foreground shadow-sm shadow-[hsl(var(--board-best)/0.35)] sm:size-6 sm:text-xs dark:shadow-[hsl(var(--board-best)/0.5)]">
-            {bestLineStep}
+        {bestLineBadge ? (
+          <span
+            title={bestLineBadge.title}
+            className="absolute right-1 top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[hsl(var(--board-best))] px-1.5 text-[0.65rem] font-bold text-primary-foreground shadow-sm shadow-[hsl(var(--board-best)/0.35)] sm:h-6 sm:min-w-6 sm:text-xs dark:shadow-[hsl(var(--board-best)/0.5)]"
+          >
+            {bestLineBadge.label}
           </span>
         ) : null}
-        {yourLineStep !== undefined ? (
-          <span className="pointer-events-none absolute bottom-1 left-1 flex size-5 items-center justify-center rounded-full bg-[hsl(var(--board-your))] text-[0.65rem] font-bold text-[hsl(var(--board-your-foreground))] shadow-sm shadow-[hsl(var(--board-your)/0.32)] sm:size-6 sm:text-xs dark:shadow-[hsl(var(--board-your)/0.45)]">
-            {yourLineStep}
+        {yourLineBadge ? (
+          <span
+            title={yourLineBadge.title}
+            className="absolute bottom-1 left-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[hsl(var(--board-your))] px-1.5 text-[0.65rem] font-bold text-[hsl(var(--board-your-foreground))] shadow-sm shadow-[hsl(var(--board-your)/0.32)] sm:h-6 sm:min-w-6 sm:text-xs dark:shadow-[hsl(var(--board-your)/0.45)]"
+          >
+            {yourLineBadge.label}
           </span>
         ) : null}
       </span>
@@ -1558,6 +1562,25 @@ function getSquareId(position: { row: number; col: number }) {
   return `square-${position.row}-${position.col}`
 }
 
+function buildSquareStepLookup(path: Position[]): SquareStepLookup {
+  const steps = new Map<string, number[]>()
+
+  path.slice(1).forEach((position, index) => {
+    const squareId = getSquareId(position)
+    const stepNumber = index + 1
+    const existingSteps = steps.get(squareId)
+
+    if (existingSteps) {
+      existingSteps.push(stepNumber)
+      return
+    }
+
+    steps.set(squareId, [stepNumber])
+  })
+
+  return steps
+}
+
 function parseSquareId(squareId: string) {
   const match = /^square-(\d+)-(\d+)$/.exec(squareId)
 
@@ -1576,7 +1599,9 @@ function buildSquareLabel({
   hasPawn,
   hasBishop,
   hasRook,
-  isLegalMove
+  isLegalMove,
+  bestLineSteps,
+  yourLineSteps
 }: {
   row: number
   col: number
@@ -1585,6 +1610,8 @@ function buildSquareLabel({
   hasBishop: boolean
   hasRook: boolean
   isLegalMove: boolean
+  bestLineSteps?: number[]
+  yourLineSteps?: number[]
 }) {
   const parts = [toBoardLabel(row, col)]
 
@@ -1593,9 +1620,33 @@ function buildSquareLabel({
   if (hasBishop) parts.push("bishop")
   if (hasRook) parts.push("rook")
   if (isLegalMove) parts.push("legal move")
+  if (bestLineSteps?.length) {
+    parts.push(describeSquareSteps("best moves", bestLineSteps))
+  }
+  if (yourLineSteps?.length) {
+    parts.push(describeSquareSteps("your moves", yourLineSteps))
+  }
   if (!hasKnight && !hasPawn && !hasBishop && !hasRook && !isLegalMove) {
     parts.push("empty square")
   }
 
   return parts.join(", ")
+}
+
+function formatSquareStepBadge(steps: number[], prefix: string) {
+  const label =
+    steps.length === 1
+      ? String(steps[0])
+      : steps.length === 2
+        ? `${steps[0]}/${steps[1]}`
+        : `${steps.length}x`
+
+  return {
+    label,
+    title: `${prefix}: ${steps.join(", ")}`
+  }
+}
+
+function describeSquareSteps(prefix: string, steps: number[]) {
+  return `${prefix} ${steps.join(", ")}`
 }
