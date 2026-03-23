@@ -24,8 +24,11 @@ jobs:
             cd /srv/jd-recipes/jd-recipes
             git pull
             rm -rf node_modules
+            rm -rf apps/recipes/node_modules
+            rm -rf apps/spk/node_modules
             npm install
             rm -rf apps/recipes/.next
+            rm -rf apps/spk/.next
             rm -rf packages/ui/dist
             sudo cp /etc/jd-recipes.env /tmp/jd-recipes.env
             sudo chown $(whoami):$(whoami) /tmp/jd-recipes.env

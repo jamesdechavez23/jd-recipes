@@ -862,7 +862,7 @@ export default function SpeedKnightGame({
       >
         <DialogContent
           showCloseButton={false}
-          className="max-h-[90vh] overflow-y-auto !max-w-4xl"
+          className="max-h-[90vh] overflow-y-auto max-w-4xl!"
         >
           <DialogHeader>
             <DialogTitle className="text-xl mb-2">
