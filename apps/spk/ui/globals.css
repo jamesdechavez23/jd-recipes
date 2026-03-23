@@ -8,6 +8,10 @@ html {
   color-scheme: light dark;
 }
 
+button {
+  touch-action: manipulation;
+}
+
 :root {
   --background: 44 34% 94%;
   --foreground: 132 14% 18%;
@@ -35,6 +39,7 @@ html {
   --board-dark: 130 16% 78%;
   --board-legal: 214 90% 52%;
   --board-danger: 6 68% 52%;
+  --board-capture: 146 54% 42%;
   --board-best: 214 90% 52%;
   --board-your: 38 92% 52%;
   --board-your-foreground: 28 96% 14%;
@@ -68,6 +73,7 @@ html {
     --board-dark: 210 26% 30%;
     --board-legal: 198 88% 66%;
     --board-danger: 4 92% 70%;
+    --board-capture: 150 64% 56%;
     --board-best: 198 88% 66%;
     --board-your: 44 100% 66%;
     --board-your-foreground: 30 88% 12%;
@@ -101,7 +107,26 @@ html {
   --board-dark: 210 26% 30%;
   --board-legal: 198 88% 66%;
   --board-danger: 4 92% 70%;
+  --board-capture: 150 64% 56%;
   --board-best: 198 88% 66%;
   --board-your: 44 100% 66%;
   --board-your-foreground: 30 88% 12%;
+}
+
+@keyframes spk-knight-tap-move {
+  from {
+    transform: translate(
+      var(--spk-knight-from-x, 0),
+      var(--spk-knight-from-y, 0)
+    );
+  }
+
+  to {
+    transform: translate(0, 0);
+  }
+}
+
+.spk-knight-tap-move {
+  animation: spk-knight-tap-move 180ms cubic-bezier(0.2, 0.9, 0.25, 1);
+  will-change: transform;
 }

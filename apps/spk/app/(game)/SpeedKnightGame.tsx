@@ -3,6 +3,7 @@
 import {
   DndContext,
   PointerSensor,
+  TouchSensor,
   useDraggable,
   useDroppable,
   useSensor,
@@ -12,7 +13,15 @@ import {
 } from "@dnd-kit/core"
 import { CSS } from "@dnd-kit/utilities"
 import Image from "next/image"
-import { useEffect, useMemo, useReducer, useRef, useState } from "react"
+import {
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent
+} from "react"
 
 import { Button } from "@repo/ui/shadcn/button"
 import {
@@ -37,6 +46,7 @@ import {
   createInitialGameState,
   type DifficultyMode,
   type GameState,
+  type Position,
   gameReducer,
   getLegalKnightMoves,
   getMinimumKnightMoves,
@@ -85,6 +95,12 @@ type CaptureAnalysisRow = {
   actualPath: Array<{ row: number; col: number }>
 }
 
+type KnightMoveAnimation = {
+  from: Position
+  to: Position
+  key: number
+}
+
 export default function SpeedKnightGame({
   initialState
 }: {
@@ -111,12 +127,19 @@ export default function SpeedKnightGame({
   >([])
   const [showBestLine, setShowBestLine] = useState(false)
   const [showYourLine, setShowYourLine] = useState(false)
+  const [knightMoveAnimation, setKnightMoveAnimation] =
+    useState<KnightMoveAnimation | null>(null)
   const knightMoveAudioRef = useRef<HTMLAudioElement | null>(null)
   const pawnCaptureAudioRef = useRef<HTMLAudioElement | null>(null)
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 4
+        distance: 2
+      }
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        distance: 8
       }
     })
   )
@@ -248,6 +271,18 @@ export default function SpeedKnightGame({
     return () => window.clearInterval(intervalId)
   }, [captureAnalysisRows, isGameActive, state.captures])
 
+  useEffect(() => {
+    if (!knightMoveAnimation) return
+
+    const timeoutId = window.setTimeout(() => {
+      setKnightMoveAnimation((current) =>
+        current?.key === knightMoveAnimation.key ? null : current
+      )
+    }, 220)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [knightMoveAnimation])
+
   const legalMoves = getLegalKnightMoves(state.knight)
 
   function handleDragStart(event: DragStartEvent) {
@@ -269,7 +304,7 @@ export default function SpeedKnightGame({
 
     if (!destination) return
 
-    handleMove(destination)
+    handleMove(destination, "drag")
   }
 
   function toggleHints() {
@@ -284,6 +319,7 @@ export default function SpeedKnightGame({
     const nextState = createInitialGameState(selectedDifficulty)
 
     dispatch({ type: "set-state", nextState })
+    setKnightMoveAnimation(null)
     setTimeRemaining(GAME_DURATION_SECONDS)
     setIsDraggingKnight(false)
     setShowBestLine(false)
@@ -307,6 +343,7 @@ export default function SpeedKnightGame({
   }
 
   function handleExitSandbox() {
+    setKnightMoveAnimation(null)
     setIsDraggingKnight(false)
     setSandboxScenario(null)
     setShowBestLine(false)
@@ -327,6 +364,7 @@ export default function SpeedKnightGame({
         moves: 0
       }
     })
+    setKnightMoveAnimation(null)
     setIsDraggingKnight(false)
     setIsGameActive(false)
     setTimeRemaining(GAME_DURATION_SECONDS)
@@ -353,6 +391,7 @@ export default function SpeedKnightGame({
         moves: 0
       }
     })
+    setKnightMoveAnimation(null)
     setIsDraggingKnight(false)
     setShowBestLine(false)
     setShowYourLine(false)
@@ -373,6 +412,7 @@ export default function SpeedKnightGame({
   }
 
   function concludeGame(nextGameOverState: GameOverState) {
+    setKnightMoveAnimation(null)
     setIsDraggingKnight(false)
     setIsGameActive(false)
     setShowBestLine(false)
@@ -389,7 +429,7 @@ export default function SpeedKnightGame({
     void audio.play().catch(() => {})
   }
 
-  function handleMove(destination: { row: number; col: number }) {
+  function handleMove(destination: Position, inputMethod: "tap" | "drag") {
     if (!isBoardInteractive) return
 
     const isLegalMove = legalMoves.some((move) =>
@@ -397,6 +437,16 @@ export default function SpeedKnightGame({
     )
 
     if (!isLegalMove) return
+
+    if (inputMethod === "tap") {
+      setKnightMoveAnimation({
+        from: state.knight,
+        to: destination,
+        key: Date.now()
+      })
+    } else {
+      setKnightMoveAnimation(null)
+    }
 
     const capturedPawn = isSamePosition(destination, state.pawn)
     const capturedBishop = state.bishop
@@ -785,6 +835,7 @@ export default function SpeedKnightGame({
                       showHints={showHints}
                       isClient={isClient}
                       isDraggingKnight={isDraggingKnight}
+                      knightMoveAnimation={knightMoveAnimation}
                       onMove={handleMove}
                     />
                   ))}
@@ -1002,6 +1053,7 @@ function Row({
   showHints,
   isClient,
   isDraggingKnight,
+  knightMoveAnimation,
   onMove
 }: {
   rowIndex: number
@@ -1016,7 +1068,8 @@ function Row({
   showHints: boolean
   isClient: boolean
   isDraggingKnight: boolean
-  onMove: (destination: { row: number; col: number }) => void
+  knightMoveAnimation: KnightMoveAnimation | null
+  onMove: (destination: Position, inputMethod: "tap" | "drag") => void
 }) {
   return (
     <>
@@ -1065,6 +1118,7 @@ function Row({
             showHints={showHints}
             isClient={isClient}
             isDraggingKnight={isDraggingKnight}
+            knightMoveAnimation={knightMoveAnimation}
             onMove={onMove}
           />
         )
@@ -1090,6 +1144,7 @@ function Square({
   showHints,
   isClient,
   isDraggingKnight,
+  knightMoveAnimation,
   onMove
 }: {
   position: { row: number; col: number }
@@ -1108,7 +1163,8 @@ function Square({
   showHints: boolean
   isClient: boolean
   isDraggingKnight: boolean
-  onMove: (destination: { row: number; col: number }) => void
+  knightMoveAnimation: KnightMoveAnimation | null
+  onMove: (destination: Position, inputMethod: "tap" | "drag") => void
 }) {
   const squareId = getSquareId(position)
   const { isOver, setNodeRef } = useDroppable({
@@ -1117,12 +1173,37 @@ function Square({
       position
     }
   })
+  const hasEnemyPiece = hasPawn || hasBishop || hasRook
+  const isUnsafeEnemyPiece = hasEnemyPiece && isEnemyAttackSquare
+  const isSafeEnemyPiece = hasEnemyPiece && !isEnemyAttackSquare
+  const shouldAnimateKnight =
+    hasKnight &&
+    knightMoveAnimation !== null &&
+    isSamePosition(knightMoveAnimation.to, position)
+
+  function handleTapMove() {
+    if (!isBoardInteractive || !isLegalMove) return
+
+    onMove(position, "tap")
+  }
+
+  function handlePointerUp(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (event.pointerType !== "touch" && event.pointerType !== "pen") {
+      return
+    }
+
+    if (isDraggingKnight) return
+
+    event.preventDefault()
+    handleTapMove()
+  }
 
   return (
     <button
       ref={setNodeRef}
       type="button"
-      onClick={() => isBoardInteractive && isLegalMove && onMove(position)}
+      onPointerUp={handlePointerUp}
+      onClick={handleTapMove}
       aria-label={buildSquareLabel({
         row: position.row,
         col: position.col,
@@ -1160,17 +1241,35 @@ function Square({
           hasKnight &&
           "border-primary bg-primary text-primary-foreground shadow-lg",
         showHints &&
+          isUnsafeEnemyPiece &&
           hasPawn &&
           !hasKnight &&
           "border-[hsl(var(--board-danger)/0.5)] bg-[hsl(var(--board-danger)/0.14)] text-foreground dark:bg-[hsl(var(--board-danger)/0.24)]",
         showHints &&
+          isUnsafeEnemyPiece &&
           hasBishop &&
           !hasKnight &&
           "border-[hsl(var(--board-danger)/0.42)] bg-[hsl(var(--board-danger)/0.1)] text-foreground dark:bg-[hsl(var(--board-danger)/0.16)]",
         showHints &&
+          isUnsafeEnemyPiece &&
           hasRook &&
           !hasKnight &&
           "border-[hsl(var(--board-danger)/0.46)] bg-[hsl(var(--board-danger)/0.12)] text-foreground dark:bg-[hsl(var(--board-danger)/0.18)]",
+        showHints &&
+          isSafeEnemyPiece &&
+          hasPawn &&
+          !hasKnight &&
+          "border-[hsl(var(--board-capture)/0.52)] bg-[hsl(var(--board-capture)/0.16)] text-foreground shadow-[0_0_0_1px_hsl(var(--board-capture)/0.16)] dark:bg-[hsl(var(--board-capture)/0.24)] dark:shadow-[0_0_0_1px_hsl(var(--board-capture)/0.24)]",
+        showHints &&
+          isSafeEnemyPiece &&
+          hasBishop &&
+          !hasKnight &&
+          "border-[hsl(var(--board-capture)/0.46)] bg-[hsl(var(--board-capture)/0.12)] text-foreground shadow-[0_0_0_1px_hsl(var(--board-capture)/0.14)] dark:bg-[hsl(var(--board-capture)/0.2)] dark:shadow-[0_0_0_1px_hsl(var(--board-capture)/0.22)]",
+        showHints &&
+          isSafeEnemyPiece &&
+          hasRook &&
+          !hasKnight &&
+          "border-[hsl(var(--board-capture)/0.5)] bg-[hsl(var(--board-capture)/0.14)] text-foreground shadow-[0_0_0_1px_hsl(var(--board-capture)/0.15)] dark:bg-[hsl(var(--board-capture)/0.22)] dark:shadow-[0_0_0_1px_hsl(var(--board-capture)/0.24)]",
         bestLineStep !== undefined &&
           "border-[hsl(var(--board-best)/0.7)] bg-[hsl(var(--board-best)/0.12)] shadow-[0_0_0_1px_hsl(var(--board-best)/0.24)] dark:bg-[hsl(var(--board-best)/0.18)] dark:shadow-[0_0_0_1px_hsl(var(--board-best)/0.32)]"
       )}
@@ -1193,7 +1292,13 @@ function Square({
             isBoardInteractive &&
             isLegalMove &&
             !hasKnight &&
-            "ring-1 ring-inset ring-[hsl(var(--board-legal)/0.22)] dark:ring-[hsl(var(--board-legal)/0.34)]"
+            !hasEnemyPiece &&
+            "ring-1 ring-inset ring-[hsl(var(--board-legal)/0.22)] dark:ring-[hsl(var(--board-legal)/0.34)]",
+          showHints &&
+            isBoardInteractive &&
+            isSafeEnemyPiece &&
+            !hasKnight &&
+            "ring-1 ring-inset ring-[hsl(var(--board-capture)/0.3)] dark:ring-[hsl(var(--board-capture)/0.42)]"
         )}
       >
         {hasKnight ? (
@@ -1202,6 +1307,7 @@ function Square({
             className="drop-shadow-sm"
             isBoardInteractive={isBoardInteractive}
             isDraggingKnight={isDraggingKnight}
+            moveAnimation={shouldAnimateKnight ? knightMoveAnimation : null}
           />
         ) : null}
         {hasPawn ? (
@@ -1257,7 +1363,7 @@ function Square({
         !hasBishop &&
         !hasRook &&
         !hasPawn ? (
-          <span className="pointer-events-none absolute size-4 rounded-full border border-[hsl(var(--board-danger)/0.5)] bg-[hsl(var(--board-danger)/0.18)] dark:bg-[hsl(var(--board-danger)/0.26)]" />
+          <span className="pointer-events-none absolute left-1/2 top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[hsl(var(--board-danger)/0.5)] bg-[hsl(var(--board-danger)/0.18)] dark:bg-[hsl(var(--board-danger)/0.26)]" />
         ) : null}
         {rowLabel !== undefined ? (
           <span className="pointer-events-none absolute left-1 top-1 text-[0.62rem] font-bold text-foreground/72 sm:hidden">
@@ -1288,12 +1394,14 @@ function KnightPiece({
   isClient,
   className,
   isBoardInteractive,
-  isDraggingKnight
+  isDraggingKnight,
+  moveAnimation
 }: {
   isClient: boolean
   className?: string
   isBoardInteractive: boolean
   isDraggingKnight: boolean
+  moveAnimation: KnightMoveAnimation | null
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
@@ -1301,12 +1409,18 @@ function KnightPiece({
       disabled: !isClient || !isBoardInteractive
     })
 
-  const style = transform
+  const style: CSSProperties | undefined = transform
     ? {
         transform: CSS.Translate.toString(transform),
         zIndex: 20
       }
-    : undefined
+    : moveAnimation
+      ? {
+          zIndex: 10,
+          ["--spk-knight-from-x" as string]: `${(moveAnimation.from.col - moveAnimation.to.col) * 100}%`,
+          ["--spk-knight-from-y" as string]: `${(moveAnimation.from.row - moveAnimation.to.row) * 100}%`
+        }
+      : undefined
 
   if (!isClient) {
     return (
@@ -1331,6 +1445,7 @@ function KnightPiece({
       style={style}
       className={cn(
         "relative flex size-full touch-none items-center justify-center",
+        moveAnimation && !transform && "spk-knight-tap-move",
         isDraggingKnight && isDragging && "opacity-70",
         className
       )}
