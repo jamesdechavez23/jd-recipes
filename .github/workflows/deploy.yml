@@ -23,6 +23,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'bash -se' << 'EOF'
             set -euo pipefail
             cd /srv/jd-recipes/jd-recipes
+            sudo systemctl stop jd-recipes jd-spk
             git fetch origin main
             git reset --hard ${{ github.sha }}
             rm -rf node_modules
@@ -37,5 +38,5 @@ jobs:
             sudo chmod 600 /tmp/jd-recipes.env
             sudo -u $(whoami) bash -lc 'set -o allexport; source /tmp/jd-recipes.env; set +o allexport; cd /srv/jd-recipes/jd-recipes && npm run build'
             sudo rm -f /tmp/jd-recipes.env
-            sudo systemctl restart jd-recipes
+            sudo systemctl start jd-recipes jd-spk
           EOF
