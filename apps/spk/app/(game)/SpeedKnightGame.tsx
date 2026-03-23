@@ -20,6 +20,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent
 } from "react"
 
@@ -1183,6 +1184,12 @@ function Square({
     onMove(position, "tap")
   }
 
+  function handleMouseDown(event: ReactMouseEvent<HTMLButtonElement>) {
+    if (event.button !== 0) return
+
+    handleTapMove()
+  }
+
   function handlePointerUp(event: ReactPointerEvent<HTMLButtonElement>) {
     if (event.pointerType !== "touch" && event.pointerType !== "pen") {
       return
@@ -1198,6 +1205,7 @@ function Square({
     <button
       ref={setNodeRef}
       type="button"
+      onMouseDown={handleMouseDown}
       onPointerUp={handlePointerUp}
       onClick={handleTapMove}
       aria-label={buildSquareLabel({
