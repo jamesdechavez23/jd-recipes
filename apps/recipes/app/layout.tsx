@@ -4,9 +4,10 @@ import type { Metadata } from "next"
 import { cookies } from "next/headers"
 import Link from "next/link"
 
+import AppNavbar from "@repo/ui/app-navbar"
 import { Button } from "@repo/ui/shadcn/button"
+import ThemeToggle from "@repo/ui/theme-toggle"
 
-import ThemeToggle from "./(ui)/ThemeToggle"
 import signOutAction from "./(actions)/signOutAction"
 import { ACCESS_TOKEN_COOKIE_NAME } from "@recipes/utils/authCookies"
 
@@ -27,7 +28,7 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body>
-        <header className="flex items-center justify-between gap-2 border-b border-border/45 bg-background/90 p-4 backdrop-blur-sm">
+        <AppNavbar>
           <Link
             href={homeHref}
             className="text-lg font-bold tracking-tight"
@@ -36,7 +37,7 @@ export default async function RootLayout({
             JD-Recipes
           </Link>
           <div className="flex items-center gap-2">
-            <ThemeToggle />
+            <ThemeToggle storageKey="jd-recipes-theme" />
             {isAuthed ? (
               <form action={signOutAction}>
                 <Button variant="outline" type="submit">
@@ -45,7 +46,7 @@ export default async function RootLayout({
               </form>
             ) : null}
           </div>
-        </header>
+        </AppNavbar>
         {children}
       </body>
     </html>

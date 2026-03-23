@@ -1,0 +1,107 @@
+@import "tailwindcss";
+@import "@repo/tailwind-config";
+
+@source "../app/**/*.{ts,tsx}";
+@source "../../../packages/ui/src/**/*.{ts,tsx}";
+
+html {
+  color-scheme: light dark;
+}
+
+:root {
+  --background: 44 34% 94%;
+  --foreground: 132 14% 18%;
+  --card: 42 36% 97%;
+  --card-foreground: 132 14% 18%;
+  --popover: 42 36% 97%;
+  --popover-foreground: 132 14% 18%;
+  --primary: 214 90% 52%;
+  --primary-foreground: 210 40% 98%;
+  --ring: 214 90% 52%;
+  --secondary: 84 18% 89%;
+  --secondary-foreground: 132 12% 24%;
+  --muted: 40 24% 90%;
+  --muted-foreground: 132 8% 42%;
+  --accent: 90 22% 87%;
+  --accent-foreground: 132 12% 24%;
+  --destructive: 6 68% 52%;
+  --destructive-foreground: 210 40% 98%;
+  --success: 148 46% 32%;
+  --success-foreground: 210 40% 98%;
+  --border: 92 14% 82%;
+  --input: 88 12% 80%;
+  --link: 156 46% 32%;
+  --board-light: 48 42% 92%;
+  --board-dark: 130 16% 78%;
+  --board-legal: 214 90% 52%;
+  --board-danger: 6 68% 52%;
+  --board-best: 214 90% 52%;
+  --board-your: 38 92% 52%;
+  --board-your-foreground: 28 96% 14%;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light):not(.dark) {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --ring: 224.3 76.3% 48%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --success: 142.1 70.6% 45.3%;
+    --success-foreground: 222.2 47.4% 11.2%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --link: 217.2 91.2% 59.8%;
+    --board-light: 217 24% 22%;
+    --board-dark: 210 26% 30%;
+    --board-legal: 198 88% 66%;
+    --board-danger: 4 92% 70%;
+    --board-best: 198 88% 66%;
+    --board-your: 44 100% 66%;
+    --board-your-foreground: 30 88% 12%;
+  }
+}
+
+:root.dark {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 217.2 91.2% 59.8%;
+  --primary-foreground: 222.2 47.4% 11.2%;
+  --ring: 224.3 76.3% 48%;
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+  --success: 142.1 70.6% 45.3%;
+  --success-foreground: 222.2 47.4% 11.2%;
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --link: 217.2 91.2% 59.8%;
+  --board-light: 217 24% 22%;
+  --board-dark: 210 26% 30%;
+  --board-legal: 198 88% 66%;
+  --board-danger: 4 92% 70%;
+  --board-best: 198 88% 66%;
+  --board-your: 44 100% 66%;
+  --board-your-foreground: 30 88% 12%;
+}
