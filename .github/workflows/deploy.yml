@@ -20,9 +20,11 @@ jobs:
 
       - name: Deploy to EC2
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'bash -se' << 'EOF'
+            set -euo pipefail
             cd /srv/jd-recipes/jd-recipes
-            git pull
+            git fetch origin main
+            git reset --hard ${{ github.sha }}
             rm -rf node_modules
             rm -rf apps/recipes/node_modules
             rm -rf apps/spk/node_modules
