@@ -152,6 +152,7 @@ export default function SpeedKnightGame({
   const [captureAnimation, setCaptureAnimation] =
     useState<CaptureAnimationState | null>(null)
   const [isSandboxCaptured, setIsSandboxCaptured] = useState(false)
+  const boardContainerRef = useRef<HTMLDivElement | null>(null)
   const knightMoveAudioRef = useRef<HTMLAudioElement | null>(null)
   const pawnCaptureAudioRef = useRef<HTMLAudioElement | null>(null)
   const gameOverOpenTimeoutRef = useRef<number | null>(null)
@@ -517,6 +518,20 @@ export default function SpeedKnightGame({
     void audio.play().catch(() => {})
   }
 
+  function keepBoardVisible() {
+    const scrollBoardIntoView = () => {
+      boardContainerRef.current?.scrollIntoView({
+        block: "center",
+        inline: "nearest",
+        behavior: "auto"
+      })
+    }
+
+    scrollBoardIntoView()
+    window.requestAnimationFrame(scrollBoardIntoView)
+    window.setTimeout(scrollBoardIntoView, 160)
+  }
+
   function handleMove(destination: Position, inputMethod: "tap" | "drag") {
     if (!isBoardInteractive) return
 
@@ -580,6 +595,7 @@ export default function SpeedKnightGame({
         }
 
         setIsSandboxCaptured(true)
+        keepBoardVisible()
         playSound(pawnCaptureAudioRef.current)
         return
       }
@@ -630,6 +646,7 @@ export default function SpeedKnightGame({
         setCaptureAnimation(animation)
       }
 
+      keepBoardVisible()
       concludeGameAfterDelay(
         {
           title: "Knight Captured",
@@ -939,7 +956,10 @@ export default function SpeedKnightGame({
                 ) : null}
               </div>
             ) : null}
-            <div className="mx-auto w-full max-w-none sm:max-w-3xl">
+            <div
+              ref={boardContainerRef}
+              className="mx-auto w-full max-w-none sm:max-w-3xl"
+            >
               <DndContext
                 sensors={sensors}
                 onDragStart={handleDragStart}
@@ -991,6 +1011,9 @@ export default function SpeedKnightGame({
       >
         <DialogContent
           showCloseButton
+          onOpenAutoFocus={(event) => {
+            event.preventDefault()
+          }}
           className="max-h-[90vh] overflow-y-auto max-w-4xl!"
         >
           <DialogHeader>
