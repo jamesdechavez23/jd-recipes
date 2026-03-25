@@ -619,18 +619,26 @@ export default function SpeedKnightGame({
             boardContainerRef={boardContainerRef}
             topContent={
               <SpeedKnightMobileHud
+                selectedDifficulty={selectedDifficulty}
                 isGameActive={isGameActive}
                 isSandboxMode={isSandboxMode}
                 sandboxScenario={sandboxScenario}
                 timeRemaining={timeRemaining}
                 score={state.captures}
                 moves={state.moves}
+                highScore={highScore}
                 sandboxRunScore={sandboxRunScore}
                 showBestLine={showBestLine}
                 showYourLine={showYourLine}
+                showHints={showHints}
+                gameOverState={gameOverState}
+                onSelectDifficulty={setSelectedDifficulty}
                 onToggleBestLine={toggleBestLine}
                 onToggleYourLine={toggleYourLine}
                 onResetSandboxPosition={handleResetSandboxPosition}
+                onReopenGameOverDialog={reopenGameOverDialog}
+                onToggleHints={toggleHints}
+                onStartGame={handleStartGame}
                 onEndGame={handleEndGame}
                 onExitSandbox={handleExitSandbox}
               />

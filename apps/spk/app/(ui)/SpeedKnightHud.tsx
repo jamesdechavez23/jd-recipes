@@ -205,42 +205,93 @@ export function SpeedKnightHud({
 }
 
 export function SpeedKnightMobileHud({
+  selectedDifficulty,
   isGameActive,
   isSandboxMode,
   sandboxScenario,
   timeRemaining,
   score,
   moves,
+  highScore,
   sandboxRunScore,
   showBestLine,
   showYourLine,
+  showHints,
+  gameOverState,
+  onSelectDifficulty,
   onToggleBestLine,
   onToggleYourLine,
   onResetSandboxPosition,
+  onReopenGameOverDialog,
+  onToggleHints,
+  onStartGame,
   onEndGame,
   onExitSandbox
 }: {
+  selectedDifficulty: DifficultyMode
   isGameActive: boolean
   isSandboxMode: boolean
   sandboxScenario: CaptureAnalysisRow | null
   timeRemaining: number
   score: number
   moves: number
+  highScore: number
   sandboxRunScore: number
   showBestLine: boolean
   showYourLine: boolean
+  showHints: boolean
+  gameOverState: GameOverState | null
+  onSelectDifficulty: (difficulty: DifficultyMode) => void
   onToggleBestLine: () => void
   onToggleYourLine: () => void
   onResetSandboxPosition: () => void
+  onReopenGameOverDialog: () => void
+  onToggleHints: () => void
+  onStartGame: () => void
   onEndGame: () => void
   onExitSandbox: () => void
 }) {
-  if (!isGameActive && !isSandboxMode) {
-    return null
-  }
+  const primaryAction = isGameActive
+    ? onEndGame
+    : isSandboxMode
+      ? onExitSandbox
+      : onStartGame
+  const primaryLabel = isGameActive
+    ? "End Game"
+    : isSandboxMode
+      ? "Exit Sandbox"
+      : "Start Game"
 
   return (
     <div className="mb-3 space-y-2 lg:hidden">
+      {!isGameActive && !isSandboxMode ? (
+        <div className="space-y-2 rounded-xl border border-border/60 bg-background/80 p-3 shadow-sm backdrop-blur-sm">
+          <div className="space-y-2">
+            <div className="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Difficulty
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {(["easy", "medium", "hard"] as const).map((difficulty) => (
+                <Button
+                  key={difficulty}
+                  type="button"
+                  variant={
+                    selectedDifficulty === difficulty ? "default" : "outline"
+                  }
+                  className="w-full px-2 capitalize"
+                  onClick={() => onSelectDifficulty(difficulty)}
+                >
+                  {difficulty}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <CompactStatCard label="Timer" value={formatTime(timeRemaining)} />
+            <CompactStatCard label="High Score" value={highScore} />
+          </div>
+        </div>
+      ) : null}
       {isGameActive ? (
         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2">
           <CompactStatCard label="Timer" value={formatTime(timeRemaining)} />
@@ -249,9 +300,9 @@ export function SpeedKnightMobileHud({
             type="button"
             variant="outline"
             className="h-full min-h-16 px-3"
-            onClick={onEndGame}
+            onClick={primaryAction}
           >
-            End Game
+            {primaryLabel}
           </Button>
         </div>
       ) : null}
@@ -267,9 +318,9 @@ export function SpeedKnightMobileHud({
               type="button"
               variant="outline"
               className="h-full min-h-16 px-3"
-              onClick={onExitSandbox}
+              onClick={primaryAction}
             >
-              Exit
+              {primaryLabel}
             </Button>
           </div>
           <div className="grid grid-cols-3 gap-2">
@@ -299,6 +350,36 @@ export function SpeedKnightMobileHud({
             </Button>
           </div>
         </>
+      ) : null}
+      <div className="grid grid-cols-2 gap-2">
+        {gameOverState && !isGameActive ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={onReopenGameOverDialog}
+          >
+            Results
+          </Button>
+        ) : null}
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={onToggleHints}
+        >
+          {showHints ? "Hide Hints" : "Show Hints"}
+        </Button>
+      </div>
+      {!isGameActive && !isSandboxMode ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={primaryAction}
+        >
+          {primaryLabel}
+        </Button>
       ) : null}
     </div>
   )
