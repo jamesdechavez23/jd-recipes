@@ -1546,7 +1546,7 @@ function Square({
         {hasKnight ? (
           <KnightPiece
             isClient={isClient}
-            className="drop-shadow-sm"
+            className="z-10 drop-shadow-sm"
             isBoardInteractive={isBoardInteractive}
             isDraggingKnight={isDraggingKnight}
             moveAnimation={shouldAnimateKnight ? knightMoveAnimation : null}
@@ -1561,7 +1561,7 @@ function Square({
             width={50}
             height={50}
             className={cn(
-              "block h-[68%] w-[68%] object-contain drop-shadow-sm sm:size-12",
+              "relative z-10 block h-[68%] w-[68%] object-contain drop-shadow-sm sm:size-12",
               hasKnight && "hidden",
               isCaptureAttackerSquare &&
                 captureAnimation?.attackerKind === "pawn" &&
@@ -1581,7 +1581,7 @@ function Square({
             width={50}
             height={50}
             className={cn(
-              "block size-[92%] object-contain drop-shadow-sm sm:size-16",
+              "relative z-10 block size-[92%] object-contain drop-shadow-sm sm:size-16",
               hasKnight && "hidden",
               isCaptureAttackerSquare &&
                 captureAnimation?.attackerKind === "bishop" &&
@@ -1601,7 +1601,7 @@ function Square({
             width={50}
             height={50}
             className={cn(
-              "block size-[84%] object-contain drop-shadow-sm sm:size-14",
+              "relative z-10 block size-[84%] object-contain drop-shadow-sm sm:size-14",
               hasKnight && "hidden",
               isCaptureAttackerSquare &&
                 captureAnimation?.attackerKind === "rook" &&
