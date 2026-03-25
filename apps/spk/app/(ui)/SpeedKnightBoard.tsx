@@ -325,13 +325,21 @@ function Square({
     handleTapMove()
   }
 
+  function handleClick(event: ReactMouseEvent<HTMLButtonElement>) {
+    if (event.detail !== 0) {
+      return
+    }
+
+    handleTapMove()
+  }
+
   return (
     <button
       ref={setNodeRef}
       type="button"
       onMouseDown={handleMouseDown}
       onPointerUp={handlePointerUp}
-      onClick={handleTapMove}
+      onClick={handleClick}
       aria-label={buildSquareLabel({
         row: position.row,
         col: position.col,
