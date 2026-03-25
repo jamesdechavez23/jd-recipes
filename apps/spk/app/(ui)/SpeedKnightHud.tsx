@@ -20,6 +20,7 @@ export function SpeedKnightHud({
   selectedDifficulty,
   isGameActive,
   isSandboxMode,
+  isInteractionLocked,
   sandboxScenario,
   timeRemaining,
   score,
@@ -43,6 +44,7 @@ export function SpeedKnightHud({
   selectedDifficulty: DifficultyMode
   isGameActive: boolean
   isSandboxMode: boolean
+  isInteractionLocked: boolean
   sandboxScenario: CaptureAnalysisRow | null
   timeRemaining: number
   score: number
@@ -100,6 +102,7 @@ export function SpeedKnightHud({
                       selectedDifficulty === difficulty ? "default" : "outline"
                     }
                     className="w-full capitalize"
+                    disabled={isInteractionLocked}
                     onClick={() => onSelectDifficulty(difficulty)}
                   >
                     {difficulty}
@@ -148,6 +151,7 @@ export function SpeedKnightHud({
                   type="button"
                   variant="outline"
                   className="w-full"
+                  disabled={isInteractionLocked}
                   onClick={onToggleBestLine}
                 >
                   {showBestLine ? "Hide Best Moves" : "Show Best Moves"}
@@ -156,6 +160,7 @@ export function SpeedKnightHud({
                   type="button"
                   variant="outline"
                   className="w-full"
+                  disabled={isInteractionLocked}
                   onClick={onToggleYourLine}
                 >
                   {showYourLine ? "Hide Your Moves" : "Show Your Moves"}
@@ -164,6 +169,7 @@ export function SpeedKnightHud({
                   type="button"
                   variant="outline"
                   className="w-full"
+                  disabled={isInteractionLocked}
                   onClick={onResetSandboxPosition}
                 >
                   Reset Position
@@ -176,6 +182,7 @@ export function SpeedKnightHud({
                 type="button"
                 variant="outline"
                 className="w-full"
+                disabled={isInteractionLocked}
                 onClick={onReopenGameOverDialog}
               >
                 Reopen Results
@@ -185,6 +192,7 @@ export function SpeedKnightHud({
               type="button"
               variant="outline"
               className="w-full"
+              disabled={isInteractionLocked}
               onClick={onToggleHints}
             >
               {showHints ? "Hide Hints" : "Show Hints"}
@@ -195,6 +203,7 @@ export function SpeedKnightHud({
           type="button"
           variant="outline"
           className="mt-auto w-full"
+          disabled={isInteractionLocked && !isGameActive && !isSandboxMode}
           onClick={primaryAction}
         >
           {primaryLabel}
@@ -208,6 +217,7 @@ export function SpeedKnightMobileHud({
   selectedDifficulty,
   isGameActive,
   isSandboxMode,
+  isInteractionLocked,
   sandboxScenario,
   timeRemaining,
   score,
@@ -231,6 +241,7 @@ export function SpeedKnightMobileHud({
   selectedDifficulty: DifficultyMode
   isGameActive: boolean
   isSandboxMode: boolean
+  isInteractionLocked: boolean
   sandboxScenario: CaptureAnalysisRow | null
   timeRemaining: number
   score: number
@@ -279,6 +290,7 @@ export function SpeedKnightMobileHud({
                     selectedDifficulty === difficulty ? "default" : "outline"
                   }
                   className="w-full px-2 capitalize"
+                  disabled={isInteractionLocked}
                   onClick={() => onSelectDifficulty(difficulty)}
                 >
                   {difficulty}
@@ -300,6 +312,7 @@ export function SpeedKnightMobileHud({
             type="button"
             variant="outline"
             className="h-full min-h-16 px-3"
+            disabled={isInteractionLocked && !isGameActive && !isSandboxMode}
             onClick={primaryAction}
           >
             {primaryLabel}
@@ -318,6 +331,7 @@ export function SpeedKnightMobileHud({
               type="button"
               variant="outline"
               className="h-full min-h-16 px-3"
+              disabled={isInteractionLocked}
               onClick={primaryAction}
             >
               {primaryLabel}
@@ -328,6 +342,7 @@ export function SpeedKnightMobileHud({
               type="button"
               variant="outline"
               className="w-full px-2 text-xs"
+              disabled={isInteractionLocked}
               onClick={onToggleBestLine}
             >
               {showBestLine ? "Hide Best" : "Best Moves"}
@@ -336,6 +351,7 @@ export function SpeedKnightMobileHud({
               type="button"
               variant="outline"
               className="w-full px-2 text-xs"
+              disabled={isInteractionLocked}
               onClick={onToggleYourLine}
             >
               {showYourLine ? "Hide Yours" : "Your Moves"}
@@ -344,6 +360,7 @@ export function SpeedKnightMobileHud({
               type="button"
               variant="outline"
               className="w-full px-2 text-xs"
+              disabled={isInteractionLocked}
               onClick={onResetSandboxPosition}
             >
               Reset
@@ -357,6 +374,7 @@ export function SpeedKnightMobileHud({
             type="button"
             variant="outline"
             className="w-full"
+            disabled={isInteractionLocked}
             onClick={onReopenGameOverDialog}
           >
             Results
@@ -366,6 +384,7 @@ export function SpeedKnightMobileHud({
           type="button"
           variant="outline"
           className="w-full"
+          disabled={isInteractionLocked}
           onClick={onToggleHints}
         >
           {showHints ? "Hide Hints" : "Show Hints"}
@@ -376,6 +395,7 @@ export function SpeedKnightMobileHud({
           type="button"
           variant="outline"
           className="w-full"
+          disabled={isInteractionLocked}
           onClick={primaryAction}
         >
           {primaryLabel}

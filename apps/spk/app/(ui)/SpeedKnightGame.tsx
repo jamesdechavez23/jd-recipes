@@ -46,6 +46,7 @@ import {
 } from "../(game)/speedKnightShared"
 
 const GAME_DURATION_SECONDS = 60
+const POST_GAME_HUD_LOCK_MS = 1000
 const HINTS_STORAGE_KEY = "spk-show-hints"
 const LEGACY_HIGH_SCORE_STORAGE_KEY = "spk-high-score"
 const KNIGHT_MOVE_SOUND_PATH = "/sounds/knight-move.mp3"
@@ -70,6 +71,7 @@ export default function SpeedKnightGame({
   const [isDraggingKnight, setIsDraggingKnight] = useState(false)
   const [gameOverState, setGameOverState] = useState<GameOverState | null>(null)
   const [isGameOverDialogOpen, setIsGameOverDialogOpen] = useState(false)
+  const [isHudInteractionLocked, setIsHudInteractionLocked] = useState(false)
   const [currentCaptureSegment, setCurrentCaptureSegment] =
     useState<CaptureSegment | null>(null)
   const [captureAnalysisRows, setCaptureAnalysisRows] = useState<
@@ -86,6 +88,7 @@ export default function SpeedKnightGame({
   const knightMoveAudioRef = useRef<HTMLAudioElement | null>(null)
   const pawnCaptureAudioRef = useRef<HTMLAudioElement | null>(null)
   const gameOverOpenTimeoutRef = useRef<number | null>(null)
+  const hudInteractionLockTimeoutRef = useRef<number | null>(null)
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -240,6 +243,12 @@ export default function SpeedKnightGame({
     return () => window.clearTimeout(timeoutId)
   }, [knightMoveAnimation])
 
+  useEffect(() => {
+    return () => {
+      clearHudInteractionLockTimeout()
+    }
+  }, [])
+
   function handleDragStart(event: DragStartEvent) {
     if (isBoardInteractive && event.active.id === KNIGHT_DRAG_ID) {
       setIsDraggingKnight(true)
@@ -263,6 +272,8 @@ export default function SpeedKnightGame({
   }
 
   function toggleHints() {
+    if (isHudInteractionLocked) return
+
     setShowHints((current) => {
       const next = !current
       window.localStorage.setItem(HINTS_STORAGE_KEY, String(next))
@@ -271,9 +282,13 @@ export default function SpeedKnightGame({
   }
 
   function handleStartGame() {
+    if (isHudInteractionLocked) return
+
     const nextState = createInitialGameState(selectedDifficulty)
 
     clearPendingGameOverDialogTimeout()
+    clearHudInteractionLockTimeout()
+    setIsHudInteractionLocked(false)
 
     dispatch({ type: "set-state", nextState })
     resetBoardPresentationState()
@@ -300,6 +315,8 @@ export default function SpeedKnightGame({
 
   function handleExitSandbox() {
     clearPendingGameOverDialogTimeout()
+    clearHudInteractionLockTimeout()
+    setIsHudInteractionLocked(false)
 
     resetBoardPresentationState()
     clearCaptureAnimation()
@@ -309,6 +326,8 @@ export default function SpeedKnightGame({
 
   function loadSandboxScenario(row: CaptureAnalysisRow) {
     clearPendingGameOverDialogTimeout()
+    clearHudInteractionLockTimeout()
+    setIsHudInteractionLocked(false)
 
     setSelectedDifficulty(row.difficulty)
     dispatch({
@@ -349,12 +368,13 @@ export default function SpeedKnightGame({
   }
 
   function reopenGameOverDialog() {
-    if (!gameOverState) return
+    if (!gameOverState || isHudInteractionLocked) return
 
     setIsGameOverDialogOpen(true)
   }
 
   function concludeGame(nextGameOverState: GameOverState) {
+    lockHudInteractions()
     resetBoardPresentationState()
     clearCaptureAnimation()
     setIsGameActive(false)
@@ -371,6 +391,7 @@ export default function SpeedKnightGame({
     nextGameOverState: GameOverState,
     delayMs: number
   ) {
+    lockHudInteractions()
     resetBoardPresentationState()
     setIsGameActive(false)
     setSandboxScenario(null)
@@ -414,6 +435,24 @@ export default function SpeedKnightGame({
 
     window.clearTimeout(gameOverOpenTimeoutRef.current)
     gameOverOpenTimeoutRef.current = null
+  }
+
+  function clearHudInteractionLockTimeout() {
+    if (hudInteractionLockTimeoutRef.current === null) {
+      return
+    }
+
+    window.clearTimeout(hudInteractionLockTimeoutRef.current)
+    hudInteractionLockTimeoutRef.current = null
+  }
+
+  function lockHudInteractions() {
+    clearHudInteractionLockTimeout()
+    setIsHudInteractionLocked(true)
+    hudInteractionLockTimeoutRef.current = window.setTimeout(() => {
+      setIsHudInteractionLocked(false)
+      hudInteractionLockTimeoutRef.current = null
+    }, POST_GAME_HUD_LOCK_MS)
   }
 
   function resetBoardPresentationState() {
@@ -588,6 +627,7 @@ export default function SpeedKnightGame({
           selectedDifficulty={selectedDifficulty}
           isGameActive={isGameActive}
           isSandboxMode={isSandboxMode}
+          isInteractionLocked={isHudInteractionLocked}
           sandboxScenario={sandboxScenario}
           timeRemaining={timeRemaining}
           score={state.captures}
@@ -622,6 +662,7 @@ export default function SpeedKnightGame({
                 selectedDifficulty={selectedDifficulty}
                 isGameActive={isGameActive}
                 isSandboxMode={isSandboxMode}
+                isInteractionLocked={isHudInteractionLocked}
                 sandboxScenario={sandboxScenario}
                 timeRemaining={timeRemaining}
                 score={state.captures}
@@ -632,7 +673,10 @@ export default function SpeedKnightGame({
                 showYourLine={showYourLine}
                 showHints={showHints}
                 gameOverState={gameOverState}
-                onSelectDifficulty={setSelectedDifficulty}
+                onSelectDifficulty={(difficulty) => {
+                  if (isHudInteractionLocked) return
+                  setSelectedDifficulty(difficulty)
+                }}
                 onToggleBestLine={toggleBestLine}
                 onToggleYourLine={toggleYourLine}
                 onResetSandboxPosition={handleResetSandboxPosition}
