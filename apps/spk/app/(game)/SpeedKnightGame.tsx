@@ -53,8 +53,12 @@ import {
   getMinimumKnightMoves,
   getShortestKnightPath,
   getSquareColor,
+  isSquareUnderBlackPawnAttack,
+  isSquareUnderBishopAttack,
+  isSquareUnderRookAttack,
   isUnsafeKnightDestination,
-  isSamePosition
+  isSamePosition,
+  resolveEnemyPiecesAfterMove
 } from "./gameState"
 
 const boardIndexes = Array.from({ length: BOARD_SIZE }, (_, index) => index)
@@ -102,6 +106,19 @@ type KnightMoveAnimation = {
   key: number
 }
 
+type CaptureAttackerKind = "pawn" | "bishop" | "rook"
+
+type CaptureAnimationState = {
+  key: number
+  attackerKind: CaptureAttackerKind
+  attackerPosition: Position
+  targetPosition: Position
+  melee: boolean
+  beamSquares: Position[]
+  deathDelayMs: number
+  totalDurationMs: number
+}
+
 type SquareStepLookup = Map<string, number[]>
 
 export default function SpeedKnightGame({
@@ -132,8 +149,12 @@ export default function SpeedKnightGame({
   const [showYourLine, setShowYourLine] = useState(false)
   const [knightMoveAnimation, setKnightMoveAnimation] =
     useState<KnightMoveAnimation | null>(null)
+  const [captureAnimation, setCaptureAnimation] =
+    useState<CaptureAnimationState | null>(null)
+  const [isSandboxCaptured, setIsSandboxCaptured] = useState(false)
   const knightMoveAudioRef = useRef<HTMLAudioElement | null>(null)
   const pawnCaptureAudioRef = useRef<HTMLAudioElement | null>(null)
+  const gameOverOpenTimeoutRef = useRef<number | null>(null)
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -147,8 +168,25 @@ export default function SpeedKnightGame({
     })
   )
   const isSandboxMode = sandboxScenario !== null
-  const isBoardInteractive = isGameActive || isSandboxMode
+  const isSandboxComplete =
+    isSandboxMode && isSamePosition(state.knight, state.pawn)
+  const sandboxCaptured = isSandboxMode && isSandboxCaptured
+  const isBoardInteractive =
+    isGameActive || (isSandboxMode && !isSandboxComplete && !sandboxCaptured)
   const currentHighScoreStorageKey = getHighScoreStorageKey(selectedDifficulty)
+  const captureBeamStepLookup = useMemo(() => {
+    if (!captureAnimation?.beamSquares.length) {
+      return new Map<string, number>()
+    }
+
+    const steps = new Map<string, number>()
+
+    captureAnimation.beamSquares.forEach((position, index) => {
+      steps.set(getSquareId(position), index)
+    })
+
+    return steps
+  }, [captureAnimation])
   const sandboxBestLine = useMemo(() => {
     if (!isSandboxMode || !showBestLine) return []
 
@@ -309,6 +347,11 @@ export default function SpeedKnightGame({
   function handleStartGame() {
     const nextState = createInitialGameState(selectedDifficulty)
 
+    if (gameOverOpenTimeoutRef.current !== null) {
+      window.clearTimeout(gameOverOpenTimeoutRef.current)
+      gameOverOpenTimeoutRef.current = null
+    }
+
     dispatch({ type: "set-state", nextState })
     setKnightMoveAnimation(null)
     setTimeRemaining(GAME_DURATION_SECONDS)
@@ -316,6 +359,8 @@ export default function SpeedKnightGame({
     setShowBestLine(false)
     setShowYourLine(false)
     setSandboxScenario(null)
+    setIsSandboxCaptured(false)
+    setCaptureAnimation(null)
     setGameOverState(null)
     setIsGameOverDialogOpen(false)
     setCaptureAnalysisRows([])
@@ -334,14 +379,26 @@ export default function SpeedKnightGame({
   }
 
   function handleExitSandbox() {
+    if (gameOverOpenTimeoutRef.current !== null) {
+      window.clearTimeout(gameOverOpenTimeoutRef.current)
+      gameOverOpenTimeoutRef.current = null
+    }
+
     setKnightMoveAnimation(null)
     setIsDraggingKnight(false)
     setSandboxScenario(null)
+    setIsSandboxCaptured(false)
+    setCaptureAnimation(null)
     setShowBestLine(false)
     setShowYourLine(false)
   }
 
   function loadSandboxScenario(row: CaptureAnalysisRow) {
+    if (gameOverOpenTimeoutRef.current !== null) {
+      window.clearTimeout(gameOverOpenTimeoutRef.current)
+      gameOverOpenTimeoutRef.current = null
+    }
+
     setSelectedDifficulty(row.difficulty)
     dispatch({
       type: "set-state",
@@ -365,10 +422,17 @@ export default function SpeedKnightGame({
     setCaptureAnalysisRows([])
     setIsGameOverDialogOpen(false)
     setSandboxScenario(row)
+    setIsSandboxCaptured(false)
+    setCaptureAnimation(null)
   }
 
   function handleResetSandboxPosition() {
     if (!sandboxScenario) return
+
+    if (gameOverOpenTimeoutRef.current !== null) {
+      window.clearTimeout(gameOverOpenTimeoutRef.current)
+      gameOverOpenTimeoutRef.current = null
+    }
 
     dispatch({
       type: "set-state",
@@ -384,6 +448,8 @@ export default function SpeedKnightGame({
     })
     setKnightMoveAnimation(null)
     setIsDraggingKnight(false)
+    setIsSandboxCaptured(false)
+    setCaptureAnimation(null)
     setShowBestLine(false)
     setShowYourLine(false)
   }
@@ -409,8 +475,39 @@ export default function SpeedKnightGame({
     setShowBestLine(false)
     setShowYourLine(false)
     setSandboxScenario(null)
+    setIsSandboxCaptured(false)
     setGameOverState(nextGameOverState)
+
+    if (gameOverOpenTimeoutRef.current !== null) {
+      window.clearTimeout(gameOverOpenTimeoutRef.current)
+      gameOverOpenTimeoutRef.current = null
+    }
+
     setIsGameOverDialogOpen(true)
+  }
+
+  function concludeGameAfterDelay(
+    nextGameOverState: GameOverState,
+    delayMs: number
+  ) {
+    setKnightMoveAnimation(null)
+    setIsDraggingKnight(false)
+    setIsGameActive(false)
+    setShowBestLine(false)
+    setShowYourLine(false)
+    setSandboxScenario(null)
+    setIsSandboxCaptured(false)
+    setGameOverState(nextGameOverState)
+    setIsGameOverDialogOpen(false)
+
+    if (gameOverOpenTimeoutRef.current !== null) {
+      window.clearTimeout(gameOverOpenTimeoutRef.current)
+    }
+
+    gameOverOpenTimeoutRef.current = window.setTimeout(() => {
+      setIsGameOverDialogOpen(true)
+      gameOverOpenTimeoutRef.current = null
+    }, delayMs)
   }
 
   function playSound(audio: HTMLAudioElement | null) {
@@ -448,6 +545,15 @@ export default function SpeedKnightGame({
       : false
 
     if (isSandboxMode) {
+      const isUnsafeMove = isUnsafeKnightDestination(
+        {
+          pawn: state.pawn,
+          bishop: state.bishop,
+          rook: state.rook
+        },
+        destination
+      )
+
       dispatch({
         type: "set-state",
         nextState: {
@@ -459,15 +565,28 @@ export default function SpeedKnightGame({
         }
       })
 
+      if (isUnsafeMove) {
+        const animation = createCaptureAnimation(
+          {
+            pawn: state.pawn,
+            bishop: state.bishop,
+            rook: state.rook
+          },
+          destination
+        )
+
+        if (animation) {
+          setCaptureAnimation(animation)
+        }
+
+        setIsSandboxCaptured(true)
+        playSound(pawnCaptureAudioRef.current)
+        return
+      }
+
       playSound(
         capturedPawn ? pawnCaptureAudioRef.current : knightMoveAudioRef.current
       )
-
-      if (capturedPawn) {
-        setShowBestLine(false)
-        setShowYourLine(false)
-        setSandboxScenario(null)
-      }
 
       return
     }
@@ -497,15 +616,32 @@ export default function SpeedKnightGame({
           moves: state.moves + 1
         }
       })
-      concludeGame({
-        title: "Knight Captured",
-        message:
-          (state.bishop && !capturedBishop) || (state.rook && !capturedRook)
-            ? "You moved into an enemy attack lane. One of the black pieces took your knight."
-            : "You moved into the pawn's capture lane. The black pawn took your knight.",
-        score: state.captures,
-        analysisRows: captureAnalysisRows
-      })
+
+      const animation = createCaptureAnimation(
+        {
+          pawn: state.pawn,
+          bishop: state.bishop,
+          rook: state.rook
+        },
+        destination
+      )
+
+      if (animation) {
+        setCaptureAnimation(animation)
+      }
+
+      concludeGameAfterDelay(
+        {
+          title: "Knight Captured",
+          message:
+            (state.bishop && !capturedBishop) || (state.rook && !capturedRook)
+              ? "You moved into an enemy attack lane. One of the black pieces took your knight."
+              : "You moved into the pawn's capture lane. The black pawn took your knight.",
+          score: state.captures,
+          analysisRows: captureAnalysisRows
+        },
+        animation ? animation.totalDurationMs : 0
+      )
       return
     }
 
@@ -598,7 +734,7 @@ export default function SpeedKnightGame({
                   )} to ${toBoardLabel(
                     sandboxScenario.pawnTarget.row,
                     sandboxScenario.pawnTarget.col
-                  )}. Capture the pawn to finish the scenario.`
+                  )}. Capture the pawn, then use reset to try again.`
                 : "Capture as many pawns as you can in 60 seconds. Don't get captured by enemy pieces."}
             </CardDescription>
           </CardHeader>
@@ -822,6 +958,8 @@ export default function SpeedKnightGame({
                       legalMoves={legalMoves}
                       bestLineStepLookup={sandboxBestLineSteps}
                       yourLineStepLookup={sandboxYourLineSteps}
+                      captureAnimation={captureAnimation}
+                      captureBeamStepLookup={captureBeamStepLookup}
                       isBoardInteractive={isBoardInteractive}
                       showHints={showHints}
                       isClient={isClient}
@@ -852,7 +990,7 @@ export default function SpeedKnightGame({
         }}
       >
         <DialogContent
-          showCloseButton={false}
+          showCloseButton
           className="max-h-[90vh] overflow-y-auto max-w-4xl!"
         >
           <DialogHeader>
@@ -1040,6 +1178,8 @@ function Row({
   legalMoves,
   bestLineStepLookup,
   yourLineStepLookup,
+  captureAnimation,
+  captureBeamStepLookup,
   isBoardInteractive,
   showHints,
   isClient,
@@ -1055,6 +1195,8 @@ function Row({
   legalMoves: Array<{ row: number; col: number }>
   bestLineStepLookup: SquareStepLookup
   yourLineStepLookup: SquareStepLookup
+  captureAnimation: CaptureAnimationState | null
+  captureBeamStepLookup: Map<string, number>
   isBoardInteractive: boolean
   showHints: boolean
   isClient: boolean
@@ -1105,6 +1247,8 @@ function Row({
             }
             bestLineSteps={bestLineStepLookup.get(getSquareId(position))}
             yourLineSteps={yourLineStepLookup.get(getSquareId(position))}
+            captureAnimation={captureAnimation}
+            captureBeamStepLookup={captureBeamStepLookup}
             isBoardInteractive={isBoardInteractive}
             showHints={showHints}
             isClient={isClient}
@@ -1131,6 +1275,8 @@ function Square({
   columnLabel,
   bestLineSteps,
   yourLineSteps,
+  captureAnimation,
+  captureBeamStepLookup,
   isBoardInteractive,
   showHints,
   isClient,
@@ -1150,6 +1296,8 @@ function Square({
   columnLabel?: string
   bestLineSteps?: number[]
   yourLineSteps?: number[]
+  captureAnimation: CaptureAnimationState | null
+  captureBeamStepLookup: Map<string, number>
   isBoardInteractive: boolean
   showHints: boolean
   isClient: boolean
@@ -1177,6 +1325,34 @@ function Square({
     hasKnight &&
     knightMoveAnimation !== null &&
     isSamePosition(knightMoveAnimation.to, position)
+  const beamStep = captureBeamStepLookup.get(squareId)
+  const isCaptureTargetSquare =
+    captureAnimation !== null &&
+    isSamePosition(captureAnimation.targetPosition, position)
+  const isCaptureAttackerSquare =
+    captureAnimation !== null &&
+    isSamePosition(captureAnimation.attackerPosition, position)
+  const meleeSlashStyle: CSSProperties | undefined =
+    captureAnimation && captureAnimation.melee
+      ? {
+          ["--spk-slash-x" as string]: `${
+            Math.sign(
+              captureAnimation.targetPosition.col -
+                captureAnimation.attackerPosition.col
+            ) * 10
+          }px`,
+          ["--spk-slash-y" as string]: `${
+            Math.sign(
+              captureAnimation.targetPosition.row -
+                captureAnimation.attackerPosition.row
+            ) * 10
+          }px`
+        }
+      : undefined
+  const knightDeathDelayMs =
+    hasKnight && isCaptureTargetSquare
+      ? (captureAnimation?.deathDelayMs ?? 0)
+      : 0
 
   function handleTapMove() {
     if (!isBoardInteractive || !isLegalMove) return
@@ -1277,7 +1453,13 @@ function Square({
           !hasKnight &&
           "border-[hsl(var(--board-capture)/0.5)] bg-[hsl(var(--board-capture)/0.14)] text-foreground shadow-[0_0_0_1px_hsl(var(--board-capture)/0.15)] dark:bg-[hsl(var(--board-capture)/0.22)] dark:shadow-[0_0_0_1px_hsl(var(--board-capture)/0.24)]",
         bestLineBadge &&
-          "border-[hsl(var(--board-best)/0.7)] bg-[hsl(var(--board-best)/0.12)] shadow-[0_0_0_1px_hsl(var(--board-best)/0.24)] dark:bg-[hsl(var(--board-best)/0.18)] dark:shadow-[0_0_0_1px_hsl(var(--board-best)/0.32)]"
+          "border-[hsl(var(--board-best)/0.7)] bg-[hsl(var(--board-best)/0.12)] shadow-[0_0_0_1px_hsl(var(--board-best)/0.24)] dark:bg-[hsl(var(--board-best)/0.18)] dark:shadow-[0_0_0_1px_hsl(var(--board-best)/0.32)]",
+        isCaptureAttackerSquare &&
+          "border-[hsl(var(--board-danger)/0.85)] bg-[hsl(var(--board-danger)/0.2)] shadow-[0_0_0_2px_hsl(var(--board-danger)/0.24),0_0_18px_hsl(var(--board-danger)/0.24)] dark:bg-[hsl(var(--board-danger)/0.28)] dark:shadow-[0_0_0_2px_hsl(var(--board-danger)/0.34),0_0_22px_hsl(var(--board-danger)/0.3)]",
+        isCaptureTargetSquare &&
+          "border-[hsl(var(--board-danger))] bg-[hsl(var(--board-danger)/0.26)] shadow-[0_0_0_2px_hsl(var(--board-danger)/0.34),0_0_28px_hsl(var(--board-danger)/0.28)] dark:bg-[hsl(var(--board-danger)/0.34)] dark:shadow-[0_0_0_2px_hsl(var(--board-danger)/0.42),0_0_34px_hsl(var(--board-danger)/0.34)]",
+        beamStep !== undefined &&
+          "border-[hsl(var(--board-danger)/0.65)] shadow-[0_0_0_2px_hsl(var(--board-danger)/0.22)]"
       )}
     >
       <span className="sr-only">
@@ -1307,6 +1489,37 @@ function Square({
             "ring-1 ring-inset ring-[hsl(var(--board-capture)/0.3)] dark:ring-[hsl(var(--board-capture)/0.42)]"
         )}
       >
+        {isCaptureAttackerSquare ? (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-[10%] rounded-[0.35rem] bg-[hsl(var(--board-danger)/0.16)] ring-2 ring-[hsl(var(--board-danger)/0.44)] dark:bg-[hsl(var(--board-danger)/0.22)] dark:ring-[hsl(var(--board-danger)/0.52)]"
+          />
+        ) : null}
+        {isCaptureTargetSquare ? (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-[8%] rounded-[0.4rem] bg-[hsl(var(--board-danger)/0.2)] ring-2 ring-[hsl(var(--board-danger)/0.56)] dark:bg-[hsl(var(--board-danger)/0.28)] dark:ring-[hsl(var(--board-danger)/0.64)]"
+          />
+        ) : null}
+        {beamStep !== undefined ||
+        (captureAnimation?.melee && isCaptureTargetSquare) ? (
+          <span
+            aria-hidden
+            className={cn(
+              "pointer-events-none absolute inset-0 spk-capture-beam",
+              isCaptureTargetSquare && "spk-capture-impact"
+            )}
+            style={
+              {
+                ["--spk-beam-delay" as string]: `${
+                  beamStep !== undefined
+                    ? beamStep * 55
+                    : Math.max((captureAnimation?.deathDelayMs ?? 0) - 120, 0)
+                }ms`
+              } as CSSProperties
+            }
+          />
+        ) : null}
         {hasKnight ? (
           <KnightPiece
             isClient={isClient}
@@ -1314,6 +1527,8 @@ function Square({
             isBoardInteractive={isBoardInteractive}
             isDraggingKnight={isDraggingKnight}
             moveAnimation={shouldAnimateKnight ? knightMoveAnimation : null}
+            isDead={knightDeathDelayMs > 0}
+            deathDelayMs={knightDeathDelayMs}
           />
         ) : null}
         {hasPawn ? (
@@ -1324,8 +1539,16 @@ function Square({
             height={50}
             className={cn(
               "block h-[68%] w-[68%] object-contain drop-shadow-sm sm:size-12",
-              hasKnight && "hidden"
+              hasKnight && "hidden",
+              isCaptureAttackerSquare &&
+                captureAnimation?.attackerKind === "pawn" &&
+                "drop-shadow-[0_0_12px_hsl(var(--board-danger)/0.62)]",
+              isCaptureAttackerSquare &&
+                captureAnimation?.melee &&
+                captureAnimation.attackerKind === "pawn" &&
+                "spk-enemy-slash"
             )}
+            style={meleeSlashStyle}
           />
         ) : null}
         {hasBishop ? (
@@ -1336,8 +1559,16 @@ function Square({
             height={50}
             className={cn(
               "block size-[92%] object-contain drop-shadow-sm sm:size-16",
-              hasKnight && "hidden"
+              hasKnight && "hidden",
+              isCaptureAttackerSquare &&
+                captureAnimation?.attackerKind === "bishop" &&
+                "drop-shadow-[0_0_12px_hsl(var(--board-danger)/0.62)]",
+              isCaptureAttackerSquare &&
+                captureAnimation?.melee &&
+                captureAnimation.attackerKind === "bishop" &&
+                "spk-enemy-slash"
             )}
+            style={meleeSlashStyle}
           />
         ) : null}
         {hasRook ? (
@@ -1348,8 +1579,16 @@ function Square({
             height={50}
             className={cn(
               "block size-[84%] object-contain drop-shadow-sm sm:size-14",
-              hasKnight && "hidden"
+              hasKnight && "hidden",
+              isCaptureAttackerSquare &&
+                captureAnimation?.attackerKind === "rook" &&
+                "drop-shadow-[0_0_12px_hsl(var(--board-danger)/0.62)]",
+              isCaptureAttackerSquare &&
+                captureAnimation?.melee &&
+                captureAnimation.attackerKind === "rook" &&
+                "spk-enemy-slash"
             )}
+            style={meleeSlashStyle}
           />
         ) : null}
         {isBoardInteractive &&
@@ -1407,13 +1646,17 @@ function KnightPiece({
   className,
   isBoardInteractive,
   isDraggingKnight,
-  moveAnimation
+  moveAnimation,
+  isDead = false,
+  deathDelayMs = 0
 }: {
   isClient: boolean
   className?: string
   isBoardInteractive: boolean
   isDraggingKnight: boolean
   moveAnimation: KnightMoveAnimation | null
+  isDead?: boolean
+  deathDelayMs?: number
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
@@ -1470,7 +1713,15 @@ function KnightPiece({
         width={56}
         height={56}
         draggable={false}
-        className="block h-[74%] w-[74%] object-contain drop-shadow-sm sm:size-14"
+        className={cn(
+          "block h-[74%] w-[74%] object-contain drop-shadow-sm sm:size-14",
+          isDead && "spk-knight-death"
+        )}
+        style={
+          {
+            ["--spk-knight-death-delay" as string]: `${deathDelayMs}ms`
+          } as CSSProperties
+        }
       />
     </span>
   )
@@ -1657,4 +1908,119 @@ function formatSquareStepBadge(steps: number[], prefix: string) {
 
 function describeSquareSteps(prefix: string, steps: number[]) {
   return `${prefix} ${steps.join(", ")}`
+}
+
+function isAdjacentSquare(from: Position, to: Position) {
+  const rowDelta = Math.abs(from.row - to.row)
+  const colDelta = Math.abs(from.col - to.col)
+
+  return rowDelta <= 1 && colDelta <= 1 && (rowDelta !== 0 || colDelta !== 0)
+}
+
+function buildBeamSquares(from: Position, to: Position) {
+  const rowDelta = to.row - from.row
+  const colDelta = to.col - from.col
+  const rowStep = Math.sign(rowDelta)
+  const colStep = Math.sign(colDelta)
+
+  const squares: Position[] = []
+  let current = {
+    row: from.row + rowStep,
+    col: from.col + colStep
+  }
+
+  while (!isSamePosition(current, to)) {
+    squares.push(current)
+    current = {
+      row: current.row + rowStep,
+      col: current.col + colStep
+    }
+  }
+
+  squares.push(to)
+  return squares
+}
+
+function getCaptureAttacker(
+  enemies: {
+    pawn: Position | null
+    bishop: Position | null
+    rook: Position | null
+  },
+  destination: Position
+): { kind: CaptureAttackerKind; position: Position } | null {
+  const slidingBlockers = [enemies.pawn, enemies.bishop, enemies.rook].filter(
+    (piece): piece is Position => piece !== null
+  )
+  const bishopBlockers = slidingBlockers.filter(
+    (piece) => !enemies.bishop || !isSamePosition(piece, enemies.bishop)
+  )
+  const rookBlockers = slidingBlockers.filter(
+    (piece) => !enemies.rook || !isSamePosition(piece, enemies.rook)
+  )
+
+  if (
+    enemies.bishop &&
+    isSquareUnderBishopAttack(destination, enemies.bishop, bishopBlockers)
+  ) {
+    return { kind: "bishop", position: enemies.bishop }
+  }
+
+  if (
+    enemies.rook &&
+    isSquareUnderRookAttack(destination, enemies.rook, rookBlockers)
+  ) {
+    return { kind: "rook", position: enemies.rook }
+  }
+
+  if (enemies.pawn && isSquareUnderBlackPawnAttack(destination, enemies.pawn)) {
+    return { kind: "pawn", position: enemies.pawn }
+  }
+
+  return null
+}
+
+function createCaptureAnimation(
+  enemies: {
+    pawn: Position | null
+    bishop: Position | null
+    rook: Position | null
+  },
+  destination: Position
+): CaptureAnimationState | null {
+  const remaining = resolveEnemyPiecesAfterMove(enemies, destination)
+  const attacker = getCaptureAttacker(
+    {
+      pawn: remaining.pawn,
+      bishop: remaining.bishop,
+      rook: remaining.rook
+    },
+    destination
+  )
+
+  if (!attacker) return null
+
+  const melee =
+    attacker.kind === "pawn" || isAdjacentSquare(attacker.position, destination)
+  const beamSquares = melee
+    ? []
+    : buildBeamSquares(attacker.position, destination)
+
+  const beamStepMs = 125
+  const meleeImpactDelayMs = 320
+  const deathDelayMs = melee
+    ? meleeImpactDelayMs + 180
+    : Math.max((beamSquares.length - 1) * beamStepMs, 0) + 320
+  const totalDurationMs = deathDelayMs + 1100
+
+  return {
+    key: Date.now(),
+    attackerKind: attacker.kind,
+    attackerPosition: attacker.position,
+    targetPosition: destination,
+    melee,
+    beamSquares,
+    deathDelayMs,
+    totalDurationMs
+  }
 }
