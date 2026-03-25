@@ -571,7 +571,7 @@ function Square({
         {bestLineBadge ? (
           <span
             title={bestLineBadge.title}
-            className="absolute right-1 top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[hsl(var(--board-best))] px-1.5 text-[0.65rem] font-bold text-primary-foreground shadow-sm shadow-[hsl(var(--board-best)/0.35)] sm:h-6 sm:min-w-6 sm:text-xs dark:shadow-[hsl(var(--board-best)/0.5)]"
+            className="pointer-events-none absolute right-0.5 top-0.5 z-20 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-[hsl(var(--board-best))] px-1 text-[0.6rem] font-bold text-primary-foreground shadow-sm shadow-[hsl(var(--board-best)/0.35)] sm:right-1 sm:top-1 sm:h-6 sm:min-w-6 sm:px-1.5 sm:text-xs dark:shadow-[hsl(var(--board-best)/0.5)]"
           >
             {bestLineBadge.label}
           </span>
@@ -579,7 +579,7 @@ function Square({
         {yourLineBadge ? (
           <span
             title={yourLineBadge.title}
-            className="absolute bottom-1 left-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[hsl(var(--board-your))] px-1.5 text-[0.65rem] font-bold text-[hsl(var(--board-your-foreground))] shadow-sm shadow-[hsl(var(--board-your)/0.32)] sm:h-6 sm:min-w-6 sm:text-xs dark:shadow-[hsl(var(--board-your)/0.45)]"
+            className="pointer-events-none absolute bottom-0.5 left-0.5 z-20 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-[hsl(var(--board-your))] px-1 text-[0.6rem] font-bold text-[hsl(var(--board-your-foreground))] shadow-sm shadow-[hsl(var(--board-your)/0.32)] sm:bottom-1 sm:left-1 sm:h-6 sm:min-w-6 sm:px-1.5 sm:text-xs dark:shadow-[hsl(var(--board-your)/0.45)]"
           >
             {yourLineBadge.label}
           </span>
