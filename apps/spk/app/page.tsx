@@ -1,4 +1,4 @@
-import SpeedKnightGame from "./(game)/SpeedKnightGame"
+import SpeedKnightGame from "./(ui)/SpeedKnightGame"
 import { createInitialGameState } from "./(game)/gameState"
 
 export default function Page() {

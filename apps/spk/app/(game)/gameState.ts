@@ -28,6 +28,25 @@ export type GameState = {
   moves: number
 }
 
+export type EnemyPieces = {
+  pawn: Position | null
+  bishop: Position | null
+  rook: Position | null
+}
+
+export type ResolvedEnemyPieces = EnemyPieces & {
+  capturedPawn: boolean
+  capturedBishop: boolean
+  capturedRook: boolean
+}
+
+export type CaptureAttackerKind = "pawn" | "bishop" | "rook"
+
+export type CaptureAttacker = {
+  kind: CaptureAttackerKind
+  position: Position
+}
+
 export type GameAction =
   | {
       type: "move-knight"
@@ -61,7 +80,15 @@ export function getLegalKnightMoves(position: Position) {
   })).filter(isWithinBoard)
 }
 
-export function isSquareUnderBlackPawnAttack(
+export function getEnemyPieces(source: EnemyPieces): EnemyPieces {
+  return {
+    pawn: source.pawn,
+    bishop: source.bishop,
+    rook: source.rook
+  }
+}
+
+function isSquareUnderBlackPawnAttack(
   position: Position,
   pawn: Position | null
 ) {
@@ -73,7 +100,7 @@ export function isSquareUnderBlackPawnAttack(
   )
 }
 
-export function isSquareUnderBishopAttack(
+function isSquareUnderBishopAttack(
   position: Position,
   bishop: Position | null,
   blockers: Position[]
@@ -112,7 +139,7 @@ export function isSquareUnderBishopAttack(
   return false
 }
 
-export function isSquareUnderRookAttack(
+function isSquareUnderRookAttack(
   position: Position,
   rook: Position | null,
   blockers: Position[]
@@ -153,21 +180,9 @@ export function isSquareUnderRookAttack(
 
 export function isSquareUnderEnemyAttack(
   position: Position,
-  enemies: {
-    pawn: Position | null
-    bishop: Position | null
-    rook: Position | null
-  }
+  enemies: EnemyPieces
 ) {
-  const slidingBlockers = [enemies.pawn, enemies.bishop, enemies.rook].filter(
-    (piece): piece is Position => piece !== null
-  )
-  const bishopBlockers = slidingBlockers.filter(
-    (piece) => !enemies.bishop || !isSamePosition(piece, enemies.bishop)
-  )
-  const rookBlockers = slidingBlockers.filter(
-    (piece) => !enemies.rook || !isSamePosition(piece, enemies.rook)
-  )
+  const { bishopBlockers, rookBlockers } = getSlidingAttackBlockers(enemies)
 
   return (
     isSquareUnderBlackPawnAttack(position, enemies.pawn) ||
@@ -177,13 +192,9 @@ export function isSquareUnderEnemyAttack(
 }
 
 export function resolveEnemyPiecesAfterMove(
-  enemies: {
-    pawn: Position | null
-    bishop: Position | null
-    rook: Position | null
-  },
+  enemies: EnemyPieces,
   destination: Position
-) {
+): ResolvedEnemyPieces {
   const capturedPawn = enemies.pawn
     ? isSamePosition(destination, enemies.pawn)
     : false
@@ -204,12 +215,35 @@ export function resolveEnemyPiecesAfterMove(
   }
 }
 
+export function getCaptureAttacker(
+  enemies: EnemyPieces,
+  position: Position
+): CaptureAttacker | null {
+  const { bishopBlockers, rookBlockers } = getSlidingAttackBlockers(enemies)
+
+  if (
+    enemies.bishop &&
+    isSquareUnderBishopAttack(position, enemies.bishop, bishopBlockers)
+  ) {
+    return { kind: "bishop", position: enemies.bishop }
+  }
+
+  if (
+    enemies.rook &&
+    isSquareUnderRookAttack(position, enemies.rook, rookBlockers)
+  ) {
+    return { kind: "rook", position: enemies.rook }
+  }
+
+  if (enemies.pawn && isSquareUnderBlackPawnAttack(position, enemies.pawn)) {
+    return { kind: "pawn", position: enemies.pawn }
+  }
+
+  return null
+}
+
 export function isUnsafeKnightDestination(
-  enemies: {
-    pawn: Position | null
-    bishop: Position | null
-    rook: Position | null
-  },
+  enemies: EnemyPieces,
   destination: Position
 ) {
   const remainingEnemies = resolveEnemyPiecesAfterMove(enemies, destination)
@@ -217,16 +251,34 @@ export function isUnsafeKnightDestination(
   return isSquareUnderEnemyAttack(destination, remainingEnemies)
 }
 
-export function getShortestKnightPath(
-  start: Position,
-  end: Position,
-  enemies: {
-    pawn: Position | null
-    bishop: Position | null
-    rook: Position | null
+export function previewKnightMove(state: GameState, destination: Position) {
+  const isLegalMove = getLegalKnightMoves(state.knight).some((move) =>
+    isSamePosition(move, destination)
+  )
+
+  if (!isLegalMove) {
+    return null
   }
-) {
-  if (isSamePosition(start, end)) {
+
+  const remainingEnemies = resolveEnemyPiecesAfterMove(
+    getEnemyPieces(state),
+    destination
+  )
+
+  return {
+    remainingEnemies,
+    nextState: {
+      ...state,
+      knight: destination,
+      bishop: remainingEnemies.bishop,
+      rook: remainingEnemies.rook,
+      moves: state.moves + 1
+    }
+  }
+}
+
+export function getShortestKnightPath(start: Position, enemies: EnemyPieces) {
+  if (enemies.pawn && isSamePosition(start, enemies.pawn)) {
     return [start]
   }
 
@@ -288,27 +340,15 @@ export function getShortestKnightPath(
   return [start]
 }
 
-export function getMinimumKnightMoves(
-  start: Position,
-  end: Position,
-  enemies: {
-    pawn: Position | null
-    bishop: Position | null
-    rook: Position | null
-  }
-) {
-  return Math.max(getShortestKnightPath(start, end, enemies).length - 1, 0)
-}
-
-export function getSquareColor(row: number, col: number) {
-  return (row + col) % 2 === 0 ? "light" : "dark"
+export function getMinimumKnightMoves(start: Position, enemies: EnemyPieces) {
+  return Math.max(getShortestKnightPath(start, enemies).length - 1, 0)
 }
 
 function randomInt(maxExclusive: number) {
   return Math.floor(Math.random() * maxExclusive)
 }
 
-export function getRandomUnoccupiedSquare(occupied: Position[]) {
+function getRandomUnoccupiedSquare(occupied: Position[]) {
   let next = {
     row: randomInt(BOARD_SIZE),
     col: randomInt(BOARD_SIZE)
@@ -349,7 +389,7 @@ function createRoundSetup(knight: Position, difficulty: DifficultyMode) {
     }
 
     if (
-      getShortestKnightPath(knight, pawn, {
+      getShortestKnightPath(knight, {
         pawn,
         bishop,
         rook
@@ -394,24 +434,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     return createInitialGameState()
   }
 
-  const legalMoves = getLegalKnightMoves(state.knight)
-  const isLegalMove = legalMoves.some((move) =>
-    isSamePosition(move, action.destination)
-  )
+  const movePreview = previewKnightMove(state, action.destination)
 
-  if (!isLegalMove) {
+  if (!movePreview) {
     return state
   }
 
-  const capturedPawn = isSamePosition(action.destination, state.pawn)
-  const capturedBishop = state.bishop
-    ? isSamePosition(action.destination, state.bishop)
-    : false
-  const capturedRook = state.rook
-    ? isSamePosition(action.destination, state.rook)
-    : false
-
-  if (capturedPawn) {
+  if (movePreview.remainingEnemies.capturedPawn) {
     const nextRoundSetup = createRoundSetup(
       action.destination,
       state.difficulty
@@ -428,14 +457,21 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
   }
 
+  return movePreview.nextState
+}
+
+function getSlidingAttackBlockers(enemies: EnemyPieces) {
+  const slidingPieces = [enemies.pawn, enemies.bishop, enemies.rook].filter(
+    (piece): piece is Position => piece !== null
+  )
+
   return {
-    difficulty: state.difficulty,
-    knight: action.destination,
-    pawn: state.pawn,
-    bishop: capturedBishop ? null : state.bishop,
-    rook: capturedRook ? null : state.rook,
-    captures: state.captures,
-    moves: state.moves + 1
+    bishopBlockers: slidingPieces.filter(
+      (piece) => !enemies.bishop || !isSamePosition(piece, enemies.bishop)
+    ),
+    rookBlockers: slidingPieces.filter(
+      (piece) => !enemies.rook || !isSamePosition(piece, enemies.rook)
+    )
   }
 }
 
