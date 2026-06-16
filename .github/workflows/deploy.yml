@@ -34,9 +34,19 @@ jobs:
       - name: Build and push Docker image
         env:
           IMAGE_TAG: ${{ github.sha }}
+          NEXT_PUBLIC_REDIRECT_ORIGIN: ${{ secrets.RECIPES_NEXT_PUBLIC_REDIRECT_ORIGIN }}
+          NEXT_PUBLIC_COGNITO_REGION: ${{ secrets.RECIPES_NEXT_PUBLIC_COGNITO_REGION }}
+          NEXT_PUBLIC_COGNITO_USER_POOL_ID: ${{ secrets.RECIPES_NEXT_PUBLIC_COGNITO_USER_POOL_ID }}
+          NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID: ${{ secrets.RECIPES_NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID }}
+          NEXT_PUBLIC_CF_TURNSTILE_SITE_KEY: ${{ secrets.RECIPES_NEXT_PUBLIC_CF_TURNSTILE_SITE_KEY }}
         run: |
           IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
           docker build -f apps/recipes/Dockerfile \
+            --build-arg NEXT_PUBLIC_REDIRECT_ORIGIN="$NEXT_PUBLIC_REDIRECT_ORIGIN" \
+            --build-arg NEXT_PUBLIC_COGNITO_REGION="$NEXT_PUBLIC_COGNITO_REGION" \
+            --build-arg NEXT_PUBLIC_COGNITO_USER_POOL_ID="$NEXT_PUBLIC_COGNITO_USER_POOL_ID" \
+            --build-arg NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID="$NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID" \
+            --build-arg NEXT_PUBLIC_CF_TURNSTILE_SITE_KEY="$NEXT_PUBLIC_CF_TURNSTILE_SITE_KEY" \
             -t "$IMAGE_URI" \
             -t "$ECR_REGISTRY/$ECR_REPOSITORY:latest" \
             .
