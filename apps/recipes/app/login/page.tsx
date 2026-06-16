@@ -29,7 +29,7 @@ export default async function CognitoLoginPage({
         <CardHeader>
           <CardTitle>Login</CardTitle>
           <CardDescription>
-            Sign in to access your recipes and continue cooking.
+            Sign in to access your recipe book and continue cooking.
           </CardDescription>
         </CardHeader>
         <CardContent>
