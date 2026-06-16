@@ -32,5 +32,6 @@ export async function verifyTurnstileToken(token: string, remoteIp?: string) {
   }
 
   const data = await res.json()
+  console.log("Turnstile verification response:", data)
   return Boolean(data.success)
 }
