@@ -17,7 +17,6 @@ export default function LoginForm({ redirectTo }: { redirectTo: string }) {
   const [state, action, pending] = useActionState(loginCognitoUserAction, {
     status: "idle"
   } satisfies LoginState)
-  console.log("client log test")
 
   return (
     <div className="space-y-4">

@@ -15,7 +15,10 @@ export default function TurnstileWidget() {
 
   useEffect(() => {
     const siteKey = process.env.NEXT_PUBLIC_CF_TURNSTILE_SITE_KEY
-    if (!siteKey) return
+    if (!siteKey) {
+      console.error("Turnstile site key is not configured on the client.")
+      return
+    }
 
     const renderWidget = () => {
       try {
@@ -42,14 +45,23 @@ export default function TurnstileWidget() {
           }
         }
       } catch (e) {
-        // ignore
+        console.error("Failed to render Turnstile widget:", e)
       }
     }
+
+    if (window.turnstile) {
+      renderWidget()
+      return
+    }
+
     const existing = document.querySelector(
       'script[src*="challenges.cloudflare.com/turnstile"]'
     ) as HTMLScriptElement | null
     if (existing) {
       existing.addEventListener("load", renderWidget)
+      existing.addEventListener("error", () => {
+        console.error("Turnstile script failed to load.")
+      })
       return () => existing.removeEventListener("load", renderWidget)
     }
 
@@ -58,6 +70,9 @@ export default function TurnstileWidget() {
     script.async = true
     script.defer = true
     script.addEventListener("load", renderWidget)
+    script.addEventListener("error", () => {
+      console.error("Turnstile script failed to load.")
+    })
     document.body.appendChild(script)
 
     return () => {

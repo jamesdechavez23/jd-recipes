@@ -15,8 +15,6 @@ export default async function CognitoLoginPage({
 }) {
   const { redirect, registered } = await searchParams
 
-  console.log("server log test")
-
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-6 py-10">
       {registered ? (
@@ -29,7 +27,7 @@ export default async function CognitoLoginPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Login Test</CardTitle>
+          <CardTitle>Login</CardTitle>
           <CardDescription>
             Sign in to access your recipes and continue cooking.
           </CardDescription>
