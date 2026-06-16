@@ -16,6 +16,7 @@ export default async function getMyRecipes(): Promise<MyRecipeListItem[]> {
     const currentUser = await requireCurrentUser()
     return await getMyRecipesByCreatorSub(currentUser.sub)
   } catch (error) {
+    console.error("[getMyRecipes]", error)
     if (error instanceof CurrentUserError) {
       throw new Error(error.message)
     }

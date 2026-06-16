@@ -59,6 +59,7 @@ export default async function registerCognitoUserAction(
 
     return { status: "needs-confirmation", email }
   } catch (err) {
+    console.error("[registerCognitoUserAction]", err)
     const message = err instanceof Error ? err.message : "Registration failed."
 
     if (

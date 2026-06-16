@@ -33,6 +33,7 @@ export default async function getRecipeById({
 
     return recipe
   } catch (error) {
+    console.error("[getRecipeById]", error)
     if (error instanceof RecipeOwnershipError) {
       notFound()
     }

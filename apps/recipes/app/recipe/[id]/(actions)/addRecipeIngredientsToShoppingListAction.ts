@@ -50,7 +50,10 @@ function parseSelectedIngredients(
         }
       ]
     })
-  } catch {
+  } catch (error) {
+    console.error("[addRecipeIngredientsToShoppingListAction]", error, {
+      stage: "parseSelectedIngredients"
+    })
     return null
   }
 }
@@ -64,6 +67,7 @@ export default async function addRecipeIngredientsToShoppingListAction(
   try {
     currentUser = await requireCurrentUser()
   } catch (error) {
+    console.error("[addRecipeIngredientsToShoppingListAction]", error)
     if (error instanceof CurrentUserError) {
       return {
         status: "error",
@@ -109,6 +113,7 @@ export default async function addRecipeIngredientsToShoppingListAction(
           }
         }
       } catch (err) {
+        console.error("[addRecipeIngredientsToShoppingListAction]", err)
         const message = err instanceof Error ? err.message : String(err)
         return { status: "error", message }
       }
@@ -128,6 +133,7 @@ export default async function addRecipeIngredientsToShoppingListAction(
       skippedCount: result.skippedCount
     }
   } catch (error) {
+    console.error("[addRecipeIngredientsToShoppingListAction]", error)
     if (
       error instanceof CurrentUserError ||
       error instanceof RecipeOwnershipError ||

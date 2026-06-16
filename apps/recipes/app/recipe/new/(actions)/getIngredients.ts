@@ -16,6 +16,7 @@ export async function getIngredients(): Promise<IngredientListItem[]> {
     await requireCurrentUser()
     return await getIngredientsList()
   } catch (error) {
+    console.error("[getIngredients]", error)
     if (error instanceof CurrentUserError) {
       throw new Error(error.message)
     }

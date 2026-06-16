@@ -23,6 +23,7 @@ export default async function deleteCookEventAction(
   try {
     currentUser = await requireCurrentUser()
   } catch (error) {
+    console.error("[deleteCookEventAction]", error)
     if (error instanceof CurrentUserError) {
       return {
         status: "error",
@@ -45,6 +46,7 @@ export default async function deleteCookEventAction(
       ownerSub: currentUser.sub
     })
   } catch (error) {
+    console.error("[deleteCookEventAction]", error)
     if (error instanceof CookEventOwnershipError) {
       return {
         status: "error",

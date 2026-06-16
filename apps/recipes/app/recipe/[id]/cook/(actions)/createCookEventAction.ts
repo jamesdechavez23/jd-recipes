@@ -38,6 +38,7 @@ export default async function createCookEventAction(
   try {
     currentUser = await requireCurrentUser()
   } catch (error) {
+    console.error("[createCookEventAction]", error)
     if (error instanceof CurrentUserError) {
       return {
         status: "error",
@@ -117,6 +118,7 @@ export default async function createCookEventAction(
 
     cookEventId = cookEvent.id
   } catch (error) {
+    console.error("[createCookEventAction]", error)
     if (
       error instanceof CurrentUserError ||
       error instanceof RecipeOwnershipError ||

@@ -33,6 +33,7 @@ export default async function createRecipeAction(
   try {
     currentUser = await requireCurrentUser()
   } catch (error) {
+    console.error("[createRecipeAction]", error)
     if (error instanceof CurrentUserError) {
       return {
         status: "error",
@@ -75,6 +76,7 @@ export default async function createRecipeAction(
       }
     }
   } catch (err) {
+    console.error("[createRecipeAction]", err)
     const message = err instanceof Error ? err.message : String(err)
     return { status: "error", message }
   }

@@ -29,6 +29,7 @@ export default async function removeShoppingListItemAction(
   try {
     currentUser = await requireCurrentUser()
   } catch (error) {
+    console.error("[removeShoppingListItemAction]", error)
     if (error instanceof CurrentUserError) {
       return {
         status: "error",
@@ -60,6 +61,7 @@ export default async function removeShoppingListItemAction(
       shoppingListItemId
     })
   } catch (error) {
+    console.error("[removeShoppingListItemAction]", error)
     if (error instanceof ShoppingListItemError) {
       return {
         status: "error",

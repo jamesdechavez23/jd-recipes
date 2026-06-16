@@ -132,6 +132,7 @@ export default async function loginCognitoUserAction(
       })
     )
   } catch (err) {
+    console.error("[loginCognitoUserAction]", err)
     const message = err instanceof Error ? err.message : "Login failed."
     return { status: "error", message }
   }

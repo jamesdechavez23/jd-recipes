@@ -22,6 +22,7 @@ export default async function deleteRecipeAction(
   try {
     currentUser = await requireCurrentUser()
   } catch (error) {
+    console.error("[deleteRecipeAction]", error)
     if (error instanceof CurrentUserError) {
       return {
         status: "error",
@@ -43,6 +44,7 @@ export default async function deleteRecipeAction(
       deletedBySub: currentUser.sub
     })
   } catch (error) {
+    console.error("[deleteRecipeAction]", error)
     if (error instanceof RecipeOwnershipError) {
       return {
         status: "error",

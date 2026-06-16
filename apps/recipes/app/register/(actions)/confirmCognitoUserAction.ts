@@ -42,6 +42,7 @@ export default async function confirmCognitoUserAction(
       })
     )
   } catch (err) {
+    console.error("[confirmCognitoUserAction]", err)
     const message = err instanceof Error ? err.message : "Confirmation failed."
     return { status: "error", message, email }
   }

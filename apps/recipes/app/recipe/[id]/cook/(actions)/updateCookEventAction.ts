@@ -49,6 +49,7 @@ export default async function updateCookEventAction(
   try {
     currentUser = await requireCurrentUser()
   } catch (error) {
+    console.error("[updateCookEventAction]", error)
     if (error instanceof CurrentUserError) {
       return {
         status: "error",
@@ -108,6 +109,7 @@ export default async function updateCookEventAction(
       removeExistingImage: removeImage
     })
   } catch (error) {
+    console.error("[updateCookEventAction]", error)
     if (
       error instanceof CurrentUserError ||
       error instanceof CookEventOwnershipError ||

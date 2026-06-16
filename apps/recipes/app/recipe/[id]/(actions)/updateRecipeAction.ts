@@ -51,6 +51,7 @@ export default async function updateRecipeAction(
       ...parsedFormData.value
     })
   } catch (error) {
+    console.error("[updateRecipeAction]", error)
     if (
       error instanceof CurrentUserError ||
       error instanceof RecipeOwnershipError ||

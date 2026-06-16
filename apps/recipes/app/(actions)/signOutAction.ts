@@ -22,7 +22,8 @@ export default async function signOutAction() {
     try {
       const client = await getCognitoClient()
       await client.send(new GlobalSignOutCommand({ AccessToken: accessToken }))
-    } catch {
+    } catch (error) {
+      console.error("[signOutAction]", error)
       // If Cognito sign-out fails, still clear cookies locally.
     }
   }

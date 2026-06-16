@@ -21,6 +21,7 @@ export default async function createIngredientAction(
   try {
     await requireAdminAccessToken()
   } catch (error) {
+    console.error("[createIngredientAction]", error)
     if (error instanceof AdminAccessError) {
       return {
         status: "error",
@@ -53,6 +54,7 @@ export default async function createIngredientAction(
       ingredient
     }
   } catch (err) {
+    console.error("[createIngredientAction]", err)
     const message = err instanceof Error ? err.message : String(err)
     return { status: "error", message }
   }
