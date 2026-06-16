@@ -57,7 +57,8 @@ export default async function loginCognitoUserAction(
 
   try {
     const headerStore = await headers()
-    const remoteIp = headerStore.get("x-forwarded-for") || undefined
+    const forwardedFor = headerStore.get("x-forwarded-for")
+    const remoteIp = forwardedFor?.split(",")[0]?.trim() || undefined
 
     const ok = await verifyTurnstileToken(turnstileToken, remoteIp)
     if (!ok) {

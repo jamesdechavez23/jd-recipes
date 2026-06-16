@@ -25,10 +25,12 @@ export async function verifyTurnstileToken(token: string, remoteIp?: string) {
   console.log("Test fetch response:", { res })
 
   if (!res.ok) {
+    const responseText = await res.text()
     console.error(
       "Failed to verify Turnstile token:",
       res.status,
-      res.statusText
+      res.statusText,
+      responseText
     )
     return false
   }
