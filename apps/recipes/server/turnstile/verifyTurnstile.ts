@@ -22,8 +22,6 @@ export async function verifyTurnstileToken(token: string, remoteIp?: string) {
     body: body.toString()
   })
 
-  console.log("Test fetch response:", { res })
-
   if (!res.ok) {
     const responseText = await res.text()
     console.error(
@@ -36,6 +34,5 @@ export async function verifyTurnstileToken(token: string, remoteIp?: string) {
   }
 
   const data = await res.json()
-  console.log("Turnstile verification response:", data)
   return Boolean(data.success)
 }
