@@ -16,6 +16,9 @@ FROM deps AS builder
 
 COPY . .
 
+# Keep runtime copy step stable even when public/ is empty or absent.
+RUN mkdir -p apps/recipes/public
+
 RUN npm run build --workspace @repo/ui && npm run build --workspace web
 
 FROM node:20-bookworm-slim AS runner
