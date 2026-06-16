@@ -1,4 +1,4 @@
-name: Deploy to EC2
+name: Deploy
 
 on:
   push:
@@ -6,7 +6,35 @@ on:
       - main
 
 jobs:
-  deploy:
+  deploy-recipes-ecs:
+    name: Deploy recipes to ECS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        run: |
+          docker build -f apps/recipes/Dockerfile -t 537378840914.dkr.ecr.us-west-2.amazonaws.com/jd-recipes:latest .
+          docker push 537378840914.dkr.ecr.us-west-2.amazonaws.com/jd-recipes:latest
+
+      - name: Force ECS deployment
+        run: |
+          aws ecs update-service --cluster default --service jd-recipes-5b7e --force-new-deployment
+
+  deploy-spk-ec2:
+    name: Deploy spk to EC2
     runs-on: ubuntu-latest
 
     steps:
@@ -18,25 +46,23 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
 
-      - name: Deploy to EC2
+      - name: Deploy spk to EC2
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'bash -se' << 'EOF'
             set -euo pipefail
             cd /srv/jd-recipes/jd-recipes
-            sudo systemctl stop jd-recipes jd-spk
+            sudo systemctl stop jd-spk
             git fetch origin main
             git reset --hard ${{ github.sha }}
             rm -rf node_modules
-            rm -rf apps/recipes/node_modules
             rm -rf apps/spk/node_modules
             npm install
-            rm -rf apps/recipes/.next
             rm -rf apps/spk/.next
             rm -rf packages/ui/dist
-            sudo cp /etc/jd-recipes.env /tmp/jd-recipes.env
-            sudo chown $(whoami):$(whoami) /tmp/jd-recipes.env
-            sudo chmod 600 /tmp/jd-recipes.env
-            sudo -u $(whoami) bash -lc 'set -o allexport; source /tmp/jd-recipes.env; set +o allexport; cd /srv/jd-recipes/jd-recipes && npm run build'
-            sudo rm -f /tmp/jd-recipes.env
-            sudo systemctl start jd-recipes jd-spk
+            sudo cp /etc/spk.env /tmp/spk.env
+            sudo chown $(whoami):$(whoami) /tmp/spk.env
+            sudo chmod 600 /tmp/spk.env
+            sudo -u $(whoami) bash -lc 'set -o allexport; source /tmp/spk.env; set +o allexport; cd /srv/jd-recipes/jd-recipes && npm run build --workspace @repo/ui && npm run build --workspace spk'
+            sudo rm -f /tmp/spk.env
+            sudo systemctl start jd-spk
           EOF

@@ -61,6 +61,67 @@ npm run lint
 npm run check-types
 ```
 
+## App Runner Deployment
+
+The recipes app can now be built as a container image for App Runner using
+the Dockerfile at `apps/recipes/Dockerfile`.
+
+Build from the repository root:
+
+```bash
+docker build -f apps/recipes/Dockerfile -t jd-recipes-recipes .
+```
+
+Run locally:
+
+```bash
+docker run --rm -p 3000:3000 --env-file apps/recipes/.env jd-recipes-recipes
+```
+
+For App Runner, the basic deployment flow is:
+
+1. Build the image from the repo root
+2. Push the image to ECR
+3. Create or update an App Runner service that points at that ECR image
+4. Configure runtime environment variables in App Runner
+5. Attach an instance role that allows the app to reach the AWS services it uses
+
+The app expects these runtime values in App Runner:
+
+```dotenv
+NODE_ENV=production
+PORT=3000
+NEXT_PUBLIC_REDIRECT_ORIGIN=...
+
+NEXT_PUBLIC_COGNITO_REGION=...
+NEXT_PUBLIC_COGNITO_USER_POOL_ID=...
+NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID=...
+COGNITO_USER_POOL_CLIENT_SECRET=...
+
+NEXT_PUBLIC_CF_TURNSTILE_SITE_KEY=...
+CF_TURNSTILE_SECRET=...
+
+AWS_REGION=...
+S3_COOK_EVENT_BUCKET=...
+
+DB_SECRET_ARN=...
+DB_HOST=...
+DB_PORT=5432
+DB_NAME=...
+DB_SSL=true
+```
+
+The App Runner instance role should allow at least:
+
+- `secretsmanager:GetSecretValue` for `DB_SECRET_ARN`
+- S3 access for the configured cook event bucket
+- KMS access if the secret or bucket encryption policy requires it
+
+Notes:
+
+- The image build should run on Linux in CI/CD or Docker, even though local standalone copy warnings can appear on Windows.
+- `PORT=3000` should stay aligned with the container port configured in App Runner.
+
 ## Environment
 
 The app currently expects values similar to the following in `apps/recipes/.env`:

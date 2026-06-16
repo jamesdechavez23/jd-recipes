@@ -8,7 +8,12 @@
     "dev:tunnel": "concurrently --kill-others-on-fail \"npm run tunnel\" \"npm run dev\"",
     "lint": "turbo run lint",
     "check-types": "turbo run check-types",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\""
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "docker:recipes:build": "docker build -f apps/recipes/Dockerfile -t jd-recipes .",
+    "docker:recipes:run": "docker run --rm -p 3000:3000 --env-file apps/recipes/.env jd-recipes",
+    "docker:recipes:build-run": "npm run docker:recipes:build && npm run docker:recipes:run",
+    "docker:recipes:ecr:login": "aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 537378840914.dkr.ecr.us-west-2.amazonaws.com",
+    "docker:recipes:ecr:push": "docker push 537378840914.dkr.ecr.us-west-2.amazonaws.com/jd-recipes:latest"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
