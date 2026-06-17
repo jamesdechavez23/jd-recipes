@@ -1,0 +1,59 @@
+flowchart LR
+  Internet["Internet / Users"]
+  DNS["Route 53"]
+  ACM["ACM Certificate"]
+  ALB["Application Load Balancer\n(ECS Express Gateway)"]
+  ECSService["ECS Express Service\n(jd-recipes-5b7e)"]
+  ECSTask["ECS Fargate Task(s)\nrecipes container"]
+
+  GitHub["GitHub Actions"]
+  ECR["ECR"]
+  CloudWatch["CloudWatch Logs & Metrics"]
+  Secrets["Secrets Manager / KMS"]
+  S3["S3 (cook event images)"]
+  SES["SES (email sending)"]
+
+  VPC["VPC"]
+  subPrivate["Private Subnets"]
+  subPublic["Public Subnets"]
+  RDS["RDS (Private)"]
+
+  TaskRole["Task Role / Execution Role\n(IAM)"]
+  CloudTrail["CloudTrail / EventBridge"]
+
+  Internet --> DNS
+  DNS --> ALB
+  ACM -.-> ALB
+  ALB --> ECSService --> ECSTask
+
+  GitHub -->|build & push image| ECR
+  ECR -->|image pull| ECSTask
+
+  ECSTask -->|app logs| CloudWatch
+  ECSTask -->|read secrets| Secrets
+  ECSTask -->|uploads/reads| S3
+  ECSTask -->|sends email| SES
+  ECSTask -.-> TaskRole
+  ECSService -.-> CloudTrail
+
+  subgraph VPC
+    subgraph subPublic["Public Subnet(s)"]
+      ALB
+    end
+
+    subgraph subPrivate["Private Subnet(s)"]
+      ECSService
+      ECSTask
+      RDS
+      EC2["Dev EC2 (private) / Bastion (SSM)"]
+    end
+  end
+
+  ECSTask --> RDS
+
+  SSM["AWS Systems Manager (SSM)"]
+  Admin["Admin / Developer"]
+
+  Admin -->|start SSM session| SSM
+  SSM -->|SSM session| EC2
+  EC2 -->|SSM port-forward to RDS dev| RDS
